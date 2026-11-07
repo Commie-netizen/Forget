@@ -1,0 +1,19 @@
+{
+  "name": "forget-desktop",
+  "productName": "Forget",
+  "version": "4.3.0",
+  "description": "Forget - application de bureau (Electron)",
+  "private": true,
+  "main": "main.js",
+  "author": "Forget",
+  "scripts": {
+    "build": "node build.mjs",
+    "dist": "node build.mjs",
+    "smoke": "electron . --smoke --smoke-out smoke.json"
+  },
+  "devDependencies": {
+    "electron": "^45.2.3",
+    "electron-builder": "^26.18.0",
+    "esbuild": "^0.28.2"
+  }
+}

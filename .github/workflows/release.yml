@@ -1,0 +1,70 @@
+name: Release
+
+# Publie une release GitHub quand un tag vX.Y.Z est poussé :
+# tests, build, exécutable portable Forget-X.Y.Z.exe, SHA256SUMS.txt, notes tirées de CHANGELOG.md.
+on:
+  push:
+    tags: ['v*.*.*']
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          persist-credentials: false # aucun jeton git laissé sur le disque du runner
+
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
+        with:
+          node-version: 22
+
+      - name: Tag et version identiques
+        shell: bash
+        run: |
+          v=$(node -p "require('./package.json').version")
+          for f in server/package.json web/package.json desktop/package.json; do
+            [ "$(node -p "require('./$f').version")" = "$v" ] || { echo "::error::$f n'est pas en $v"; exit 1; }
+          done
+          grep -q "export const VERSION = '$v'" server/src/version.mjs || { echo "::error::server/src/version.mjs n'est pas en $v"; exit 1; }
+          [ "${GITHUB_REF_NAME}" = "v$v" ] || { echo "::error::tag ${GITHUB_REF_NAME} != v$v"; exit 1; }
+
+      - name: Dépendances
+        run: |
+          npm --prefix server ci --no-audit --no-fund
+          npm --prefix web ci --no-audit --no-fund
+          npm --prefix desktop ci --no-audit --no-fund
+
+      - name: Tests
+        run: npm run test:all
+
+      - name: Build
+        run: |
+          npm run build
+          npm run desktop:build
+
+      - name: Sommes de contrôle et notes
+        shell: bash
+        run: |
+          v="${GITHUB_REF_NAME#v}"
+          cd dist-desktop
+          test -f "Forget-$v.exe"
+          sha256sum "Forget-$v.exe" > SHA256SUMS.txt
+          cat SHA256SUMS.txt
+          cd ..
+          node -e "const s=require('fs').readFileSync('CHANGELOG.md','utf8');const m=s.split(/^## /m).find(b=>b.startsWith(process.argv[1]+'\n'));require('fs').writeFileSync('release-notes.md',m?m.slice(m.indexOf('\n')+1).trim():'Voir CHANGELOG.md');" "$v"
+
+      - name: Publier la release
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          v="${GITHUB_REF_NAME#v}"
+          gh release create "$GITHUB_REF_NAME" \
+            "dist-desktop/Forget-$v.exe" \
+            "dist-desktop/SHA256SUMS.txt" \
+            --title "Forget $v" \
+            --notes-file release-notes.md \
+            --verify-tag

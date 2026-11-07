@@ -1,0 +1,28 @@
+{
+  "name": "forget",
+  "version": "4.3.0",
+  "private": true,
+  "type": "module",
+  "description": "Forget — application Windows autonome et 100 % locale : nettoyage de son propre historique Discord (purges massives périodiques, édition, mode disparition, archive locale) et scans de data brokers. Hors-ligne par défaut, aucune télémétrie.",
+  "scripts": {
+    "install:all": "npm --prefix server install --no-audit --no-fund && npm --prefix web install --no-audit --no-fund && npm --prefix desktop install --no-audit --no-fund",
+    "build": "npm --prefix web run build",
+    "start": "npm run build && node server/src/index.mjs",
+    "serve": "node server/src/index.mjs",
+    "dev:server": "node server/src/index.mjs",
+    "dev:web": "npm --prefix web run dev",
+    "test": "node server/test/smoke.mjs",
+    "test:discord": "node server/test/discord.test.mjs",
+    "test:privacy": "node server/test/privacy.test.mjs",
+    "verify": "node verify.mjs",
+    "desktop:build": "node desktop/build.mjs",
+    "build:exe": "node packaging/build.mjs --rebuild-web",
+    "test:limiter": "node server/test/limiter.test.mjs",
+    "test:import": "node server/test/import.test.mjs",
+    "test:social": "node server/test/social.test.mjs",
+    "test:v5": "node server/test/discord-v5.test.mjs",
+    "test:v43": "node server/test/v43.test.mjs",
+    "test:security": "node server/test/security.test.mjs",
+    "test:all": "npm test && npm run test:discord && npm run test:privacy && npm run test:limiter && npm run test:import && npm run test:social && npm run test:v5 && npm run test:v43 && npm run test:security"
+  }
+}

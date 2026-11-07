@@ -1,0 +1,65 @@
+# Dependencies
+node_modules/
+
+# Build outputs
+dist/
+dist-desktop/
+build/
+out/
+.cache/
+.vite/
+*.tsbuildinfo
+smoke.json
+
+# Local data (never commit user databases)
+data/
+*.sqlite
+*.sqlite-*
+*.sqlite3
+*.db
+*.db-*
+
+# Logs
+*.log
+npm-debug.log*
+
+# Secrets
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+*.pfx
+secrets/
+secret*.json
+token*.txt
+
+# Installers and archives
+*.exe
+*.msi
+*.zip
+*.blockmap
+
+# Test / coverage
+coverage/
+.nyc_output/
+
+# Editors and OS
+.vscode/
+.idea/
+*.swp
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# Internal analysis files (never published)
+extract/
+shots/
+evidence/
+REPORT.md
+
+# Internal development notes (not part of the public app)
+SPEC.md
+SPEC-V*.md
+verify.mjs
+packaging/

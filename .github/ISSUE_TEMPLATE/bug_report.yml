@@ -1,0 +1,41 @@
+name: Rapport de bug
+description: Signaler un comportement incorrect
+labels: [bug]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Ne collez jamais de token, de contenu de message ni de base de données. Pour une faille de sécurité, utilisez les avis de sécurité privés.
+  - type: input
+    id: version
+    attributes:
+      label: Version de Forget
+      placeholder: "4.0.0"
+    validations:
+      required: true
+  - type: input
+    id: os
+    attributes:
+      label: Version de Windows
+      placeholder: "Windows 11 23H2"
+  - type: textarea
+    id: description
+    attributes:
+      label: Description
+    validations:
+      required: true
+  - type: textarea
+    id: steps
+    attributes:
+      label: Étapes pour reproduire
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: Comportement attendu
+  - type: textarea
+    id: logs
+    attributes:
+      label: Logs (caviardés)
+      render: text
