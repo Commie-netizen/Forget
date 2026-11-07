@@ -2,7 +2,7 @@
 
 ![Version](https://img.shields.io/badge/version-4.3.0-blue)
 ![Platform](https://img.shields.io/badge/platform-Windows-0078d4)
-![License](https://img.shields.io/badge/license-MIT-green)
+![License](https://img.shields.io/badge/license-PolyForm%20Noncommercial-orange)
 ![Offline by default](https://img.shields.io/badge/network-offline%20by%20default-success)
 
 A **100% local** Windows desktop app for cleaning up **your own history**: Discord messages, X and Reddit posts,
@@ -118,4 +118,17 @@ Architecture: `server/` (local Hono API, SQLite, Discord / X / Reddit / TikTok e
 
 ## License
 
-[MIT](LICENSE), copyright Forget contributors.
+[PolyForm Noncommercial 1.0.0](LICENSE), copyright Forget contributors.
+
+- **Free for noncommercial use**: personal use, study, research, hobby projects, and charities, schools,
+  and public organizations.
+- **No commercial use**: you may not sell Forget, its code, or a modified version, or use it for a
+  commercial purpose.
+- **Credit the authors**: any copy or modified version you share must include the license and this line:
+
+  ```
+  Required Notice: Copyright (c) 2026 Forget contributors (https://github.com/Commie-netizen/Forget)
+  ```
+
+This license is source-available, not an OSI-approved open source license. The third-party libraries Forget
+uses keep their own licenses.

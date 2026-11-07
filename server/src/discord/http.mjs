@@ -64,7 +64,7 @@ export async function discordFetch(token, method, path, { query, body, maxRetrie
       throw new DiscordError(0, 'Discord network unavailable');
     }
     if (res.status === 429) {
-      if (attempt >= maxRetries) throw new DiscordError(429, 'Rate limit : trop de tentatives', data);
+      if (attempt >= maxRetries) throw new DiscordError(429, 'Rate limit: too many attempts', data);
       let wait = Number(data?.retry_after ?? res.headers?.get?.('retry-after') ?? 1);
       if (!Number.isFinite(wait) || wait < 0) wait = 1;
       const waitMs = Math.ceil(wait * 1000) + attempt * 250; // small, increasing backoff

@@ -4,6 +4,7 @@
   "private": true,
   "type": "module",
   "description": "Forget: a standalone, 100% local Windows app to clean up your own history (Discord, X, Reddit, TikTok reposts) and scan data brokers. Offline by default, no telemetry.",
+  "license": "PolyForm-Noncommercial-1.0.0",
   "scripts": {
     "install:all": "npm --prefix server install --no-audit --no-fund && npm --prefix web install --no-audit --no-fund && npm --prefix desktop install --no-audit --no-fund",
     "build": "npm --prefix web run build",

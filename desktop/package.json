@@ -3,6 +3,7 @@
   "productName": "Forget",
   "version": "4.3.0",
   "description": "Forget - desktop app (Electron)",
+  "license": "PolyForm-Noncommercial-1.0.0",
   "private": true,
   "main": "main.js",
   "author": "Forget",

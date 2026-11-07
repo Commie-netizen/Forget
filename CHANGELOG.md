@@ -3,6 +3,12 @@
 Format: one section per version, newest first. The release workflow publishes the text from the section
 matching the tag (`v4.3.0` → `## 4.3.0`).
 
+## Unreleased
+
+### Changed
+- License: PolyForm Noncommercial 1.0.0 replaces MIT. Commercial use and sale are not allowed, and every
+  copy must keep the license and the `Required Notice` crediting the authors.
+
 ## 4.3.0
 
 ### Added

@@ -9,7 +9,7 @@ Thank you for your interest. Please read the [Code of Conduct](CODE_OF_CONDUCT.m
 ## Setup
 
 ```bash
-git clone <url-du-depot>
+git clone https://github.com/Commie-netizen/Forget.git
 cd <dossier>
 npm run install:all     # server, web, desktop
 npm run build           # compile the web interface
@@ -47,3 +47,9 @@ Every new feature or fix must add or update a test. `npm run verify` is recommen
 ## Contributing summary
 
 Node 22, `npm run install:all`, keep the four commands above passing, add tests for new behavior, never commit secrets or user data, keep the app offline by default with no telemetry.
+
+## License of contributions
+
+By submitting a contribution, you agree that it is released under the project's license,
+[PolyForm Noncommercial 1.0.0](LICENSE), and that you are added to the "Forget contributors" credited
+in the Required Notice.
