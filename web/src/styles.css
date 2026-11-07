@@ -162,7 +162,7 @@ a { color: var(--accent); }
 .stat-value { font-size: 28px; font-weight: 700; letter-spacing: -0.02em; }
 .stat-label { color: var(--muted); font-size: 12.5px; }
 
-/* ===== Boutons ===== */
+/* ===== Buttons ===== */
 .btn {
   display: inline-flex; align-items: center; justify-content: center; gap: 6px; padding: 8px 14px;
   border: 1px solid var(--border); border-radius: 10px; background: var(--surface-2); color: var(--text);
@@ -179,7 +179,7 @@ a { color: var(--accent); }
 .btn:disabled, .btn[aria-disabled='true'] { opacity: 0.45; cursor: not-allowed; }
 .link { background: none; border: 0; padding: 0; color: var(--accent); cursor: pointer; font: inherit; text-decoration: underline; }
 
-/* ===== Formulaires ===== */
+/* ===== Forms ===== */
 .field { display: flex; flex-direction: column; gap: 5px; min-width: 0; }
 .field-label { font-size: 12.5px; color: var(--muted); font-weight: 500; }
 input[type='search'], input[type='text'], input[type='password'], input[type='number'], input[type='date'], input:not([type]), select {
@@ -255,7 +255,7 @@ input[type='range'] { width: 100%; accent-color: var(--accent); }
 .spinner { width: 18px; height: 18px; border: 2px solid var(--border); border-top-color: var(--accent); border-radius: 50%; animation: spin 0.8s linear infinite; }
 @keyframes spin { to { transform: rotate(360deg); } }
 
-/* Listes */
+/* Lists */
 .list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; }
 .list > li { padding: 10px 0; border-top: 1px solid var(--border); }
 .list > li:first-child { border-top: 0; }
@@ -323,7 +323,7 @@ input[type='range'] { width: 100%; accent-color: var(--accent); }
 .platform-list { list-style: none; margin: 12px 0 0; padding: 0; display: flex; flex-direction: column; gap: 8px; }
 .platform-list li { display: flex; justify-content: space-between; align-items: center; gap: 12px; padding: 10px 12px; border: 1px solid var(--border); border-radius: 10px; }
 
-/* Modale */
+/* Modal */
 .modal-backdrop { position: fixed; inset: 0; background: rgba(0, 0, 0, 0.6); display: grid; place-items: center; z-index: 50; padding: 20px; }
 .modal { width: 100%; max-width: 480px; max-height: 90vh; overflow: auto; background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 22px; box-shadow: var(--shadow); }
 .modal.wide { max-width: 640px; }
@@ -335,7 +335,7 @@ input[type='range'] { width: 100%; accent-color: var(--accent); }
 .modal-body { display: flex; flex-direction: column; gap: 10px; }
 .modal-foot { display: flex; justify-content: flex-end; gap: 8px; margin-top: 18px; }
 
-/* ===== Responsive (>= 1024 px visé ; repli en dessous) ===== */
+/* ===== Responsive (target >= 1024 px; fallback below) ===== */
 @media (max-width: 1180px) {
   .grid.stats { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .search-panel { grid-template-columns: 1fr 1fr; }
@@ -350,13 +350,13 @@ input[type='range'] { width: 100%; accent-color: var(--accent); }
   * { animation: none !important; transition: none !important; }
 }
 
-/* Sélection souris : lignes cliquables, case purement décorative */
+/* Mouse selection: clickable rows, purely decorative checkbox */
 .msg-list li { cursor: pointer; user-select: none; }
 .msg-list li:hover { background: var(--accent-soft); }
 .msg-list .check { cursor: pointer; }
 .msg-list input.deco { pointer-events: none; }
 
-/* ===== Bannière globale de jobs (shell) ===== */
+/* ===== Global jobs banner (shell) ===== */
 .jobs-banner {
   position: sticky; top: 0; z-index: 20; display: flex; align-items: center; gap: 12px;
   padding: 9px 36px; background: var(--accent-soft); color: var(--text);
@@ -366,12 +366,12 @@ input[type='range'] { width: 100%; accent-color: var(--accent); }
 @keyframes jobs-pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.3; } }
 @media (prefers-reduced-motion: reduce) { .jobs-dot { animation: none; } }
 
-/* ===== Connexion : option avancée repliable ===== */
+/* ===== Login: collapsible advanced option ===== */
 .advanced { border: 1px solid var(--border); border-radius: 10px; padding: 10px 12px; background: var(--surface-2); }
 .advanced > summary { cursor: pointer; font-size: 13px; color: var(--muted); }
 .advanced[open] > summary { margin-bottom: 12px; }
 
-/* ===== Accueil : blocs marketing ===== */
+/* ===== Home: marketing sections ===== */
 .promo {
   display: grid; grid-template-columns: minmax(0, 1.1fr) minmax(0, 1fr); gap: 28px; align-items: center;
   padding: 26px 28px; border: 1px solid var(--border); border-radius: 16px;
@@ -402,7 +402,7 @@ input[type='range'] { width: 100%; accent-color: var(--accent); }
 }
 @media (max-width: 900px) { .promo { grid-template-columns: 1fr; } }
 
-/* Forget — nettoyage et suivi */
+/* Forget: cleanup and tracking */
 .content { max-width: 1480px; }
 .page-head h1 { font-size: 28px; letter-spacing: -.035em; }
 .card { box-shadow: 0 2px 8px #0000000a; }
@@ -426,7 +426,7 @@ input:disabled, select:disabled { opacity: .5; cursor: not-allowed; }
 .export-preview { max-height: 230px; overflow: auto; }
 @media(max-width: 1100px) { .content { padding: 24px; } .grid.stats { grid-template-columns: repeat(2,minmax(0,1fr)); } }
 
-/* 4.3 : aperçu avant suppression, éléments TikTok, mise à jour */
+/* 4.3: deletion preview, TikTok items, updates */
 .preview-box { border: 1px solid var(--border); background: var(--surface-2); border-radius: 10px; padding: 10px 12px; margin: 10px 0; }
 .preview-box p { margin: 0 0 6px; }
 .preview-list { list-style: none; margin: 0; padding: 0; max-height: 180px; overflow: auto; }

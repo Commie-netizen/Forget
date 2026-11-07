@@ -1,25 +1,25 @@
-// Couche de confidentialité : verrou réseau (enveloppe de fetch) + état hors-ligne.
-// Aucun appel sortant depuis ce module ; état persisté uniquement dans la table `setting`.
+// Privacy layer: network lock (fetch wrapper) and offline state.
+// No outgoing calls from this module; state persisted only in the setting table.
 import { Hono } from 'hono';
 
 const KEY = 'privacy.offline';
-// Mises à jour : uniquement à la demande (bouton « Rechercher une mise à jour »), jamais en tâche de fond.
+// Updates: only on request ("Check for updates" button), never in the background.
 const UPDATE_HOSTS = ['api.github.com', 'github.com', 'objects.githubusercontent.com', 'release-assets.githubusercontent.com'];
-// OAuth : échange du code et renouvellement des jetons X / Reddit.
+// OAuth: code exchange and X / Reddit token refresh.
 const OAUTH_HOSTS = ['www.reddit.com'];
 export const ALLOWED_HOSTS = ['discord.com', 'gateway.discord.gg', 'cdn.discordapp.com', 'media.discordapp.net', 'api.x.com', 'oauth.reddit.com', ...OAUTH_HOSTS, ...UPDATE_HOSTS];
 const LOCAL_HOSTS = ['127.0.0.1', 'localhost', '[::1]', '::1'];
 const GUARD = Symbol.for('forget.networkGuard');
-const PRIVACY_NOTE = 'Application 100 % locale : aucun compte Forget en ligne, aucune télémétrie. '
-  + 'En mode hors-ligne (défaut), aucune connexion sortante n’est autorisée ; '
-  + 'sinon les API Discord, X et Reddit sont autorisées, ainsi que GitHub quand vous cliquez sur « Rechercher une mise à jour ». '
-  + 'Les fenêtres Facebook, Instagram et TikTok s’ouvrent uniquement sur votre demande.';
+const PRIVACY_NOTE = '100% local app: no online Forget account, no telemetry. '
+  + 'In offline mode (default), no outgoing connection is allowed; '
+  + 'otherwise the Discord, X and Reddit APIs are allowed, plus GitHub when you click "Check for updates". '
+  + 'Facebook, Instagram and TikTok windows only open when you ask.';
 
-let guardDb = null; // dernière base liée au verrou
+let guardDb = null; // last database bound to the lock
 const stats = { blocked: 0, allowed: 0, lastDestination: null, lastBlockedHost: null };
 const blockedHosts = new Set();
 
-// Lu à chaque requête sortante : requête préparée une seule fois par base.
+// Read on each outgoing request: statement prepared once per database.
 const readStmts = new WeakMap();
 function readOffline(db) {
   try {
@@ -29,7 +29,7 @@ function readOffline(db) {
     if (!row) return true;
     return JSON.parse(row.value) !== false;
   } catch {
-    return true; // en cas de doute : hors-ligne
+    return true; // when in doubt: offline
   }
 }
 
@@ -62,7 +62,7 @@ export function resetNetworkStats() {
 export function installNetworkGuard(db) {
   guardDb = db;
   const current = globalThis.fetch;
-  if (current && current[GUARD]) return db; // déjà posé : pas de double enveloppe
+  if (current && current[GUARD]) return db; // already installed: no duplicate wrapper
   const inner = current;
   const guarded = async function guardedFetch(input, init) {
     const host = hostOf(input);
@@ -104,7 +104,7 @@ export function privacyRouter(db) {
   app.patch('/', async (c) => {
     const body = await c.req.json().catch(() => null);
     if (!body || typeof body !== 'object' || typeof body.offline !== 'boolean') {
-      return c.json({ error: 'offline doit être un booléen' }, 400);
+      return c.json({ error: 'offline must be a boolean' }, 400);
     }
     writeOffline(db, body.offline);
     return c.json(state(db));

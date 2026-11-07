@@ -4,7 +4,7 @@ import { insertArchive } from '../discord/store.mjs';
 import { USER_AGENT } from '../version.mjs';
 
 export const PLATFORMS = {
-  // OAuth 2.0 (docs.x.com : PKCE, client public ; wiki OAuth2 de Reddit : application « installed », sans secret).
+  // OAuth 2.0 (docs.x.com: PKCE, public client; Reddit OAuth2 wiki: "installed" application, no secret).
   twitter: { name: 'Twitter/X', mode: 'api', base: 'https://api.x.com', scopes: 'tweet.read tweet.write users.read',
     authorize: 'https://x.com/i/oauth2/authorize', token: 'https://api.x.com/2/oauth2/token', oauthScopes: 'tweet.read tweet.write users.read offline.access' },
   reddit: { name: 'Reddit', mode: 'api', base: 'https://oauth.reddit.com', scopes: 'identity history read edit',
@@ -26,13 +26,13 @@ export function socialRouter(db, { fetchImpl = (...args) => fetch(...args), now 
   initSocial(db);
   const app = new Hono(), sessions = new Map(), queues = new Map(), deadlines = new Map(), tasks = new Map();
   const fail = (message, status = 400) => Object.assign(new Error(message), { status });
-  const cfg = p => { if (!PLATFORMS[p]) throw fail('Plateforme inconnue', 404); return PLATFORMS[p]; };
+  const cfg = p => { if (!PLATFORMS[p]) throw fail('Unknown platform', 404); return PLATFORMS[p]; };
   const cipher = () => globalThis.__FORGET_CIPHER;
   const busy = p => [...tasks.values()].some(t => t.provider === p);
-  // Identifiants : jeton seul (saisie manuelle, stocké tel quel) ou JSON { access, refresh, expiresAt, clientId } (OAuth).
+  // Credentials: token only (manual entry, stored as-is) or JSON { access, refresh, expiresAt, clientId } (OAuth).
   const parseCred = raw => {
     if (typeof raw !== 'string' || !raw) return null;
-    if (raw.startsWith('{')) { try { const j = JSON.parse(raw); if (typeof j.access === 'string' && j.access) return j; } catch { /* jeton brut */ } }
+    if (raw.startsWith('{')) { try { const j = JSON.parse(raw); if (typeof j.access === 'string' && j.access) return j; } catch { /*raw token */ } }
     return { access: raw };
   };
   const serializeCred = cred => (cred.refresh || cred.clientId ? JSON.stringify(cred) : cred.access);
@@ -48,24 +48,24 @@ export function socialRouter(db, { fetchImpl = (...args) => fetch(...args), now 
     db.prepare('INSERT OR REPLACE INTO socialAccount VALUES (?,?,?,?)').run(p, String(userId), String(username), secret);
     sessions.set(p, cred);
   }
-  // Échange / renouvellement de jeton : POST form-urlencoded vers l'endpoint officiel du fournisseur.
+  // Token exchange / refresh: form-urlencoded POST to the provider's official endpoint.
   async function tokenRequest(p, form, clientId) {
     const headers = { 'Content-Type': 'application/x-www-form-urlencoded', 'User-Agent': USER_AGENT };
     if (p === 'reddit') headers.Authorization = 'Basic ' + Buffer.from(`${clientId}:`).toString('base64');
     let res;
     try { res = await fetchImpl(cfg(p).token, { method: 'POST', redirect: 'error', headers, body: new URLSearchParams(form).toString(), signal: AbortSignal.timeout(30000) }); }
-    catch { throw fail('Connexion refusée ou indisponible. Vérifiez le mode hors-ligne.', 502); }
+    catch { throw fail('Connection refused or unavailable. Check offline mode.', 502); }
     let data = {};
-    try { data = JSON.parse(await res.text() || '{}'); } catch { /* réponse non JSON */ }
+    try { data = JSON.parse(await res.text() || '{}'); } catch { /*non-JSON response */ }
     if (!res.ok || typeof data.access_token !== 'string' || !data.access_token) {
-      throw fail(`La plateforme a refusé l’autorisation${data.error ? ` (${String(data.error).slice(0, 80)})` : ` (HTTP ${res.status})`}.`, res.status === 400 || res.status === 401 ? 401 : 502);
+      throw fail(`The platform refused the authorization${data.error ? ` (${String(data.error).slice(0, 80)})` : ` (HTTP ${res.status})`}.`, res.status === 400 || res.status === 401 ? 401 : 502);
     }
     return data;
   }
   const credFrom = (data, prev = {}) => ({ ...prev, access: data.access_token, refresh: data.refresh_token || prev.refresh || null,
     expiresAt: Number(data.expires_in) > 0 ? now() + Number(data.expires_in) * 1000 : null });
-  // Renouvelle le jeton s'il expire dans moins d'une minute (refresh token OAuth uniquement).
-  // Un seul renouvellement à la fois par plateforme : X fait tourner les refresh tokens (usage unique).
+  // Refresh the token if it expires in less than a minute (OAuth refresh tokens only).
+  // One refresh at a time per platform: X rotates refresh tokens (single use).
   const refreshing = new Map();
   async function fresh(p, a) {
     const c = a.cred;
@@ -74,9 +74,9 @@ export function socialRouter(db, { fetchImpl = (...args) => fetch(...args), now 
       const run = (async () => {
         const form = p === 'twitter' ? { grant_type: 'refresh_token', refresh_token: c.refresh, client_id: c.clientId } : { grant_type: 'refresh_token', refresh_token: c.refresh };
         const cred = credFrom(await tokenRequest(p, form, c.clientId), c);
-        // Compte déconnecté (ou remplacé) pendant l'échange : on ne réinsère rien.
+        // Account disconnected (or replaced) during exchange: do not reinsert it.
         const row = db.prepare('SELECT userId FROM socialAccount WHERE provider=?').get(p);
-        if (!row || row.userId !== String(a.userId)) throw fail('Compte déconnecté pendant le renouvellement du jeton.', 409);
+        if (!row || row.userId !== String(a.userId)) throw fail('Account disconnected while the token was being renewed.', 409);
         persist(p, a.userId, a.username, cred);
         return cred;
       })();
@@ -86,17 +86,17 @@ export function socialRouter(db, { fetchImpl = (...args) => fetch(...args), now 
     const cred = await refreshing.get(p);
     return { ...a, token: cred.access, cred };
   }
-  // Identité vérifiée puis stockage chiffré (ou mémoire de session si le chiffrement est indisponible).
+  // Verify identity, then store encrypted (or in session memory if encryption is unavailable).
   async function establish(p, cred) {
     const user = await request(p, cred.access, 'GET', p === 'twitter' ? '/2/users/me' : '/api/v1/me');
     const id = p === 'twitter' ? user.data?.id : user.id, name = p === 'twitter' ? user.data?.username : user.name;
-    if (!id || !name) throw fail('Impossible de vérifier l’identité du compte.', 502);
+    if (!id || !name) throw fail('Could not verify the account identity.', 502);
     persist(p, id, name, cred);
     return status(p);
   }
   async function waitControl(control) {
     while (control?.paused && !control.cancelled) await sleep(100);
-    if (control?.cancelled) throw fail('Opération annulée', 499);
+    if (control?.cancelled) throw fail('Operation cancelled', 499);
   }
   async function request(p, token, method, path, { body, control } = {}) {
     const previous = queues.get(p) || Promise.resolve();
@@ -113,9 +113,9 @@ export function socialRouter(db, { fetchImpl = (...args) => fetch(...args), now 
           res = await fetchImpl(url.href, { method, redirect: 'error', signal: AbortSignal.timeout(30000),
             headers: { Authorization: `Bearer ${token}`, 'User-Agent': USER_AGENT, ...(body ? { 'Content-Type': 'application/x-www-form-urlencoded' } : {}) },
             body: body ? new URLSearchParams(body).toString() : undefined });
-        } catch { throw fail('Connexion refusée ou indisponible. Vérifiez le mode hors-ligne.', 502); }
+        } catch { throw fail('Connection refused or unavailable. Check offline mode.', 502); }
         const text = await res.text(); let data;
-        try { data = text ? JSON.parse(text) : {}; } catch { if (res.status === 429) data = {}; else throw fail('Réponse inattendue de la plateforme', 502); }
+        try { data = text ? JSON.parse(text) : {}; } catch { if (res.status === 429) data = {}; else throw fail('Unexpected response from the platform', 502); }
         const num = h => { const v = res.headers.get(h); return v === null ? null : Number(v); };
         const remaining = num(p === 'twitter' ? 'x-rate-limit-remaining' : 'x-ratelimit-remaining');
         const reset = num(p === 'twitter' ? 'x-rate-limit-reset' : 'x-ratelimit-reset');
@@ -128,18 +128,18 @@ export function socialRouter(db, { fetchImpl = (...args) => fetch(...args), now 
         }
         deadlines.set(p, deadline);
         if (res.status === 429) continue;
-        if (!res.ok) throw fail(res.status === 401 ? 'Session expirée : reconnectez le compte.' : res.status === 403 ? 'Accès refusé : vérifiez les permissions et votre accès API.' : res.status === 402 ? 'La plateforme demande un accès API payant ou des crédits.' : `La plateforme a répondu HTTP ${res.status}.`, res.status);
-        if (data?.json?.errors?.length) throw fail('La plateforme a refusé cette opération.', 422);
+        if (!res.ok) throw fail(res.status === 401 ? 'Session expired: reconnect the account.' : res.status === 403 ? 'Access denied: check the permissions and your API access.' : res.status === 402 ? 'The platform requires paid API access or credits.' : `The platform answered HTTP ${res.status}.`, res.status);
+        if (data?.json?.errors?.length) throw fail('The platform refused this operation.', 422);
         return data;
       }
-      throw fail('Limite API persistante : opération arrêtée après cinq tentatives.', 429);
+      throw fail('Persistent API limit: operation stopped after five attempts.', 429);
     });
     queues.set(p, current); return current;
   }
   function normalize(p, raw) {
-    if (p === 'twitter') return { id: raw.id, author: raw.author_id, text: raw.text || '', date: raw.created_at || null, url: `https://x.com/i/status/${raw.id}`, kind: 'publication' };
+    if (p === 'twitter') return { id: raw.id, author: raw.author_id, text: raw.text || '', date: raw.created_at || null, url: `https://x.com/i/status/${raw.id}`, kind: 'post' };
     return { id: raw.name, author: raw.author, text: [raw.title, raw.selftext || raw.body].filter(Boolean).join('\n'), date: raw.created_utc ? new Date(raw.created_utc * 1000).toISOString() : null,
-      url: typeof raw.permalink === 'string' && raw.permalink.startsWith('/') ? 'https://www.reddit.com' + raw.permalink : '', kind: raw.name?.startsWith('t1_') ? 'commentaire' : 'publication' };
+      url: typeof raw.permalink === 'string' && raw.permalink.startsWith('/') ? 'https://www.reddit.com' + raw.permalink : '', kind: raw.name?.startsWith('t1_') ? 'comment' : 'post' };
   }
   const owned = (p, item, a) => String(item.author || '').toLowerCase() === String(p === 'twitter' ? a.userId : a.username).toLowerCase();
   function cache(p, a, item) { db.prepare('INSERT OR REPLACE INTO socialItem VALUES (?,?,?,?)').run(p, a.userId, item.id, JSON.stringify(item)); }
@@ -148,9 +148,9 @@ export function socialRouter(db, { fetchImpl = (...args) => fetch(...args), now 
       ? await request(p, a.token, 'GET', `/2/tweets/${id}?tweet.fields=author_id,created_at`, { control })
       : await request(p, a.token, 'GET', `/api/info?id=${encodeURIComponent(id)}&raw_json=1`, { control });
     const raw = p === 'twitter' ? data.data : data?.data?.children?.find(c => c.data?.name === id)?.data;
-    if (!raw) throw fail('Publication introuvable ; aucune suppression effectuée.', 404);
+    if (!raw) throw fail('Post not found; nothing was deleted.', 404);
     const item = normalize(p, raw);
-    if (item.id !== id || !owned(p, item, a)) throw fail('La publication ne correspond pas au compte connecté.', 403);
+    if (item.id !== id || !owned(p, item, a)) throw fail('The post does not belong to the connected account.', 403);
     return item;
   }
   function status(p) {
@@ -159,32 +159,32 @@ export function socialRouter(db, { fetchImpl = (...args) => fetch(...args), now 
       persistence: a ? (a.secret ? 'encrypted' : 'session') : null, waitMs: Math.max(0, (deadlines.get(p) || 0) - now()), scopes: c.scopes || null,
       oauth: c.mode === 'api' ? { scopes: c.oauthScopes, renewable: !!a?.cred?.refresh, expiresAt: a?.cred?.expiresAt || null, clientId: a?.cred?.clientId || null } : null };
   }
-  const required = async p => { const a = account(p); if (!a) throw fail('Connectez d’abord ce compte.', 409); return fresh(p, a); };
+  const required = async p => { const a = account(p); if (!a) throw fail('Connect this account first.', 409); return fresh(p, a); };
   app.onError((e,c) => c.json({ error: e.message }, [400,401,402,403,404,409,422,429,499,501,502].includes(e.status) ? e.status : 500));
   app.get('/', c => c.json(Object.keys(PLATFORMS).map(status)));
   app.get('/:provider/status', c => c.json(status(c.req.param('provider'))));
   app.post('/:provider/connect', async c => {
-    const p = c.req.param('provider'); if (cfg(p).mode !== 'api') throw fail('Ce compte utilise le nettoyage assisté.');
-    if (busy(p)) throw fail('Arrêtez l’opération avant de changer de compte.', 409);
+    const p = c.req.param('provider'); if (cfg(p).mode !== 'api') throw fail('This account uses assisted cleanup.');
+    if (busy(p)) throw fail('Stop the operation before switching accounts.', 409);
     const b = await c.req.json(), token = typeof b.token === 'string' ? b.token.trim() : '';
-    if (!token || token.length > 8192 || /[\r\n]/.test(token)) throw fail('Jeton OAuth utilisateur requis.');
+    if (!token || token.length > 8192 || /[\r\n]/.test(token)) throw fail('A user OAuth token is required.');
     return c.json(await establish(p, { access: token }));
   });
-  // Connexion OAuth : fenêtre officielle du fournisseur, redirection interceptée par Electron (rien n'écoute en local).
+  // OAuth login: official provider window, redirect intercepted by Electron (no local listener).
   app.post('/:provider/oauth', async c => {
-    const p = c.req.param('provider'), conf = cfg(p); if (conf.mode !== 'api') throw fail('Ce compte utilise le nettoyage assisté.');
-    if (busy(p)) throw fail('Arrêtez l’opération avant de changer de compte.', 409);
+    const p = c.req.param('provider'), conf = cfg(p); if (conf.mode !== 'api') throw fail('This account uses assisted cleanup.');
+    if (busy(p)) throw fail('Stop the operation before switching accounts.', 409);
     const offline = db.prepare("SELECT value FROM setting WHERE key='privacy.offline'").get();
-    if (!offline || offline.value !== 'false') throw fail('Désactivez le mode hors-ligne dans Réglages → Confidentialité.', 409);
+    if (!offline || offline.value !== 'false') throw fail('Turn off offline mode in Settings > Privacy.', 409);
     const hook = globalThis.__FORGET_OAUTH_WINDOW;
-    if (typeof hook !== 'function') throw fail('Disponible dans l’application Electron uniquement.', 501);
+    if (typeof hook !== 'function') throw fail('Only available in the desktop app.', 501);
     const b = await c.req.json().catch(() => ({}));
     const clientId = typeof b.clientId === 'string' ? b.clientId.trim() : '';
     const redirectUri = typeof b.redirectUri === 'string' ? b.redirectUri.trim() : '';
-    if (!/^[A-Za-z0-9_.~-]{4,128}$/.test(clientId)) throw fail('Client ID de votre application requis.');
-    let ru; try { ru = new URL(redirectUri); } catch { throw fail('URL de redirection invalide.'); }
+    if (!/^[A-Za-z0-9_.~-]{4,128}$/.test(clientId)) throw fail('Your app Client ID is required.');
+    let ru; try { ru = new URL(redirectUri); } catch { throw fail('Invalid redirect URL.'); }
     const loopback = ['127.0.0.1', 'localhost', '[::1]'].includes(ru.hostname);
-    if (redirectUri.length > 300 || !(ru.protocol === 'https:' || (ru.protocol === 'http:' && loopback)) || ru.hash) throw fail('URL de redirection : https, ou http sur 127.0.0.1 / localhost.');
+    if (redirectUri.length > 300 || !(ru.protocol === 'https:' || (ru.protocol === 'http:' && loopback)) || ru.hash) throw fail('Redirect URL: https, or http on 127.0.0.1 / localhost.');
     const state = randomBytes(16).toString('base64url'), verifier = randomBytes(48).toString('base64url');
     const auth = new URL(conf.authorize);
     const q = { response_type: 'code', client_id: clientId, redirect_uri: redirectUri, scope: conf.oauthScopes, state };
@@ -192,23 +192,23 @@ export function socialRouter(db, { fetchImpl = (...args) => fetch(...args), now 
     else q.duration = 'permanent';
     for (const [k, v] of Object.entries(q)) auth.searchParams.set(k, v);
     const r = await hook({ provider: p, authorizeUrl: auth.href, redirectUri });
-    if (r?.cancelled) throw fail('Connexion annulée.', 400);
-    let back; try { back = new URL(r?.url); } catch { throw fail('Réponse OAuth invalide.', 502); }
-    if (back.searchParams.get('state') !== state) throw fail('Réponse OAuth invalide (state).', 400);
-    if (back.searchParams.get('error')) throw fail(`Autorisation refusée : ${back.searchParams.get('error').slice(0, 80)}.`, 403);
-    const code = back.searchParams.get('code'); if (!code) throw fail('Code d’autorisation absent.', 502);
+    if (r?.cancelled) throw fail('Login cancelled.', 400);
+    let back; try { back = new URL(r?.url); } catch { throw fail('Invalid OAuth response.', 502); }
+    if (back.searchParams.get('state') !== state) throw fail('Invalid OAuth response (state).', 400);
+    if (back.searchParams.get('error')) throw fail(`Authorization denied: ${back.searchParams.get('error').slice(0, 80)}.`, 403);
+    const code = back.searchParams.get('code'); if (!code) throw fail('Authorization code missing.', 502);
     const form = { grant_type: 'authorization_code', code, redirect_uri: redirectUri, ...(p === 'twitter' ? { client_id: clientId, code_verifier: verifier } : {}) };
     const cred = credFrom(await tokenRequest(p, form, clientId), { clientId, redirectUri });
     return c.json(await establish(p, cred));
   });
   app.delete('/:provider/connect', c => {
     const p = c.req.param('provider'); cfg(p);
-    if (busy(p)) throw fail('Arrêtez l’opération avant de déconnecter le compte.', 409);
+    if (busy(p)) throw fail('Stop the operation before disconnecting the account.', 409);
     sessions.delete(p); db.prepare('DELETE FROM socialAccount WHERE provider=?').run(p); return c.json({ ok: true });
   });
   app.get('/:provider/posts', async c => {
     const p = c.req.param('provider'); cfg(p); const a = await required(p);
-    const after = c.req.query('after') || ''; if (after.length > 1024) throw fail('Curseur invalide');
+    const after = c.req.query('after') || ''; if (after.length > 1024) throw fail('Invalid cursor');
     const path = p === 'twitter' ? `/2/users/${encodeURIComponent(a.userId)}/tweets?max_results=100&tweet.fields=author_id,created_at${after ? '&pagination_token=' + encodeURIComponent(after) : ''}`
       : `/user/${encodeURIComponent(a.username)}/overview?limit=100&raw_json=1${after ? '&after=' + encodeURIComponent(after) : ''}`;
     const data = await request(p, a.token, 'GET', path);
@@ -218,20 +218,20 @@ export function socialRouter(db, { fetchImpl = (...args) => fetch(...args), now 
     return c.json({ items, next: p === 'twitter' ? data.meta?.next_token || null : data.data?.after || null });
   });
   app.post('/:provider/window', async c => {
-    const p = c.req.param('provider'); if (cfg(p).mode !== 'assisted') throw fail('Utilisez la connexion OAuth.');
+    const p = c.req.param('provider'); if (cfg(p).mode !== 'assisted') throw fail('Use the OAuth login.');
     const offline = db.prepare("SELECT value FROM setting WHERE key='privacy.offline'").get();
-    if (!offline || offline.value !== 'false') throw fail('Désactivez le mode hors-ligne dans Réglages → Confidentialité.', 409);
-    if (!globalThis.__FORGET_SOCIAL_WINDOW) throw fail('Disponible dans l’application Electron uniquement.', 501);
+    if (!offline || offline.value !== 'false') throw fail('Turn off offline mode in Settings > Privacy.', 409);
+    if (!globalThis.__FORGET_SOCIAL_WINDOW) throw fail('Only available in the desktop app.', 501);
     await globalThis.__FORGET_SOCIAL_WINDOW(p); return c.json({ opened: true, authenticated: false });
   });
   app.get('/:provider/jobs', c => { const p = c.req.param('provider'); cfg(p); return c.json(db.prepare('SELECT * FROM socialJob WHERE provider=? ORDER BY createdAt DESC LIMIT 20').all(p)); });
   app.post('/:provider/jobs', async c => {
     const p = c.req.param('provider'); cfg(p); let a = await required(p); const b = await c.req.json();
-    if (busy(p)) throw fail('Une opération est déjà en cours pour ce compte.',409);
+    if (busy(p)) throw fail('An operation is already running for this account.',409);
     const ids = [...new Set(Array.isArray(b.ids) ? b.ids : [])];
     const valid = p === 'twitter' ? /^\d{1,22}$/ : /^t[13]_[a-z0-9]+$/;
-    if (b.confirm !== true || !ids.length || ids.length > 500 || ids.some(id => typeof id !== 'string' || !valid.test(id))) throw fail('Confirmez une sélection de 1 à 500 publications.');
-    if (ids.some(id => !db.prepare('SELECT id FROM socialItem WHERE provider=? AND userId=? AND id=?').get(p,a.userId,id))) throw fail('Rechargez et vérifiez les publications avant de les sélectionner.');
+    if (b.confirm !== true || !ids.length || ids.length > 500 || ids.some(id => typeof id !== 'string' || !valid.test(id))) throw fail('Confirm a selection of 1 to 500 posts.');
+    if (ids.some(id => !db.prepare('SELECT id FROM socialItem WHERE provider=? AND userId=? AND id=?').get(p,a.userId,id))) throw fail('Reload and review the posts before selecting them.');
     const id = randomUUID(), control = { provider:p, cancelled:false, paused:false };
     db.prepare("INSERT INTO socialJob(id,provider,userId,status,total,createdAt) VALUES (?,?,?,'queued',?,?)").run(id,p,a.userId,ids.length);
     tasks.set(id,control);
@@ -247,7 +247,7 @@ export function socialRouter(db, { fetchImpl = (...args) => fetch(...args), now 
             messageCreatedAt: item.date ? Date.parse(item.date) : null, action:'delete', meta:{ url:item.url, archiveScope:'text-and-metadata' } });
           const result = p === 'twitter' ? await request(p,a.token,'DELETE',`/2/tweets/${mid}`,{control})
             : await request(p,a.token,'POST','/api/del',{body:{id:mid},control});
-          if (p === 'twitter' && result.data?.deleted !== true) throw fail('Suppression non confirmée par X.',502);
+          if (p === 'twitter' && result.data?.deleted !== true) throw fail('Deletion not confirmed by X.',502);
           db.prepare('UPDATE socialJob SET deleted=deleted+1 WHERE id=?').run(id);
           db.prepare('DELETE FROM socialItem WHERE provider=? AND userId=? AND id=?').run(p,a.userId,mid);
         }
@@ -261,7 +261,7 @@ export function socialRouter(db, { fetchImpl = (...args) => fetch(...args), now 
   app.post('/:provider/jobs/:id/:action', c => {
     const p = c.req.param('provider'), id = c.req.param('id'), action = c.req.param('action');
     if (!['pause','resume','cancel'].includes(action)) throw fail('Action inconnue');
-    const t=tasks.get(id); if(!t || t.provider!==p) throw fail('Opération active introuvable',404);
+    const t=tasks.get(id); if(!t || t.provider!==p) throw fail('Active operation not found',404);
     if(action==='cancel') t.cancelled=true; else t.paused=action==='pause';
     if(action!=='cancel') db.prepare('UPDATE socialJob SET status=? WHERE id=?').run(t.paused?'paused':'running',id);
     return c.json({ok:true});

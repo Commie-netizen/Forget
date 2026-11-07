@@ -1,17 +1,17 @@
-// Jobs de suppression / édition en masse : asynchrones, annulables, progression persistée.
+// Bulk deletion/edit jobs: asynchronous, cancellable, with persisted progress.
 import * as store from './store.mjs';
 import { discordFetch, sleep } from './http.mjs';
 import { collectMessages } from './search.mjs';
 import { archiveMessage } from './archive.mjs';
 import { normalizeMessage, toSnowflake, cmpId, BULK_MAX_AGE_MS, protectionFilter } from './util.mjs';
 
-export const HISTORY_PAGE = 100; // taille de page de GET /channels/{id}/messages
-const GUILD_TEXT_TYPES = new Set([0, 5]); // salons texte, annonces
-const isDeletableType = (t) => t === 0 || (t >= 6 && t <= 21); // messages/réponses ; pas les évènements système
+export const HISTORY_PAGE = 100; // page size for GET /channels/{id}/messages
+const GUILD_TEXT_TYPES = new Set([0, 5]); // text and announcement channels
+const isDeletableType = (t) => t === 0 || (t >= 6 && t <= 21); // messages/replies; excludes system events
 
-const running = new Map(); // jobId -> Promise (permet l'attente en test et l'arrêt propre)
+const running = new Map(); // jobId -> Promise (allows tests to wait and supports clean shutdown)
 
-/** Modes de vitesse : safe 900 ms/1, fast 300 ms/2, turbo 120 ms/3, custom (délai >= 150, concurrence 1-4). */
+/** Speed modes: safe 900 ms/1, fast 300 ms/2, turbo 120 ms/3, custom (delay >= 150, concurrency 1-4). */
 export const SPEED_PRESETS = {
   adaptive: { mode: 'adaptive', delayMs: 0, concurrency: 4 },
   safe: { mode: 'safe', delayMs: 900, concurrency: 1 },
@@ -31,7 +31,7 @@ export function resolveSpeed(speed = {}) {
   return { ...SPEED_PRESETS.safe };
 }
 
-/** Espace les débuts de requêtes d'au moins delayMs (partagé entre les "lanes" concurrentes). */
+/** Space request starts at least delayMs apart (shared across concurrent lanes). */
 export function makePacer(delayMs) {
   let next = 0;
   return async () => {
@@ -42,7 +42,7 @@ export function makePacer(delayMs) {
   };
 }
 
-/** Calcule le nouveau contenu d'un message selon l'opération d'édition. */
+/** Compute the new message content for the editing operation. */
 export function applyEdit(content, edit) {
   switch (edit.mode) {
     case 'replace': {
@@ -54,25 +54,25 @@ export function applyEdit(content, edit) {
     case 'append': return content + String(edit.text ?? '');
     case 'prepend': return String(edit.text ?? '') + content;
     case 'set': return String(edit.text ?? '');
-    default: throw new Error(`mode d'édition inconnu : ${edit.mode}`);
+    default: throw new Error(`unknown edit mode: ${edit.mode}`);
   }
 }
 
 export function validateEdit(edit) {
-  if (!edit || typeof edit !== 'object') return 'edit requis';
+  if (!edit || typeof edit !== 'object') return 'edit is required';
   if (edit.mode === 'replace') {
-    if (!edit.find) return 'edit.find requis';
-    if (String(edit.find).length > 500) return 'edit.find trop long (500 caractères max.)'; // limite le risque de ReDoS
-    if (edit.regex) { try { new RegExp(String(edit.find), 'g'); } catch { return 'expression régulière invalide'; } }
+    if (!edit.find) return 'edit.find is required';
+    if (String(edit.find).length > 500) return 'edit.find is too long (500 characters max)'; // limit the risk of ReDoS
+    if (edit.regex) { try { new RegExp(String(edit.find), 'g'); } catch { return 'invalid regular expression'; } }
     return null;
   }
-  if (['append', 'prepend', 'set'].includes(edit.mode)) return typeof edit.text === 'string' ? null : 'edit.text requis';
-  return 'edit.mode invalide (replace|append|prepend|set)';
+  if (['append', 'prepend', 'set'].includes(edit.mode)) return typeof edit.text === 'string' ? null : 'edit.text is required';
+  return 'invalid edit.mode (replace|append|prepend|set)';
 }
 
 function startJob(kind, params) {
   const jobId = store.createJob(kind, params);
-  // Démarrage différé : la requête HTTP répond immédiatement avec jobId.
+  // Deferred start: the HTTP request returns jobId immediately.
   const p = new Promise((resolve) => setImmediate(resolve)).then(() => runJob(jobId, kind, params))
     .catch(() => {}).finally(() => running.delete(jobId));
   running.set(jobId, p);
@@ -85,7 +85,7 @@ export const waitForJob = (jobId) => running.get(jobId) ?? Promise.resolve();
 export function cancelJob(jobId) {
   store.requestCancel(jobId);
 }
-/** Arrêt du serveur : demande l'annulation de tous les jobs actifs. */
+/** Server shutdown: request cancellation of all active jobs. */
 export function cancelAllJobs() {
   for (const id of running.keys()) store.requestCancel(id);
 }
@@ -93,7 +93,7 @@ export async function waitAllJobs() {
   await Promise.all([...running.values()]);
 }
 
-/** Exécute `worker` sur chaque item avec N lanes ; chaque lane vérifie l'annulation à chaque itération. */
+/** Run worker on each item across N lanes; each lane checks for cancellation on every iteration. */
 async function runPool(items, concurrency, shouldStop, worker) {
   let i = 0;
   const lanes = Array.from({ length: Math.min(concurrency, items.length) }, async () => {
@@ -109,7 +109,7 @@ async function runPool(items, concurrency, shouldStop, worker) {
 async function runJob(jobId, kind, params) {
   const token = store.getToken();
   try {
-    if (!token) throw new Error('Discord non connecté');
+    if (!token) throw new Error('Discord is not connected');
     store.updateJob(jobId, { status: 'running', startedAt: Date.now() });
     const speed = resolveSpeed(params.speed);
     const stats = { progress: 0, deleted: 0, edited: 0, failed: 0 };
@@ -118,13 +118,13 @@ async function runJob(jobId, kind, params) {
       pace: makePacer(speed.delayMs),
       shouldStop: () => store.isCancelRequested(jobId),
       log: (level, message, meta) => store.addLog(jobId, level, message, meta),
-      onRateLimit: (i) => store.addLog(jobId, 'warn', `429 : attente ${i.retryAfterMs} ms (tentative ${i.attempt})`, i),
+      onRateLimit: (i) => store.addLog(jobId, 'warn', `429: waiting ${i.retryAfterMs} ms (attempt ${i.attempt})`, i),
       save: () => store.updateJob(jobId, stats),
       archived: new Set(),
       bulkOk: params.allowBulk === false ? false : undefined,
       protect: protectionFilter(params),
     };
-    ctx.log('info', `Job ${kind} démarré (vitesse ${speed.mode} : ${speed.delayMs} ms, concurrence ${speed.concurrency})`);
+    ctx.log('info', `Job ${kind} started (speed ${speed.mode}: ${speed.delayMs} ms, concurrency ${speed.concurrency})`);
     if (kind === 'delete' && useHistory(params)) {
       await runHistoryDelete(ctx);
     } else {
@@ -136,14 +136,14 @@ async function runJob(jobId, kind, params) {
     ctx.save();
     const cancelled = ctx.shouldStop();
     store.updateJob(jobId, { status: cancelled ? 'cancelled' : 'done', finishedAt: Date.now() });
-    ctx.log('info', cancelled ? 'Job annulé' : 'Job terminé', stats);
+    ctx.log('info', cancelled ? 'Job cancelled' : 'Job finished', stats);
   } catch (e) {
     store.addLog(jobId, 'error', e.message);
     store.updateJob(jobId, { status: 'failed', error: e.message, finishedAt: Date.now() });
   }
 }
 
-/** Liste les messages cibles : ids fournis (récupérés un par un) ou recherche de ses propres messages. */
+/** List target messages: explicit IDs (fetched individually) or a search of the user's own messages. */
 async function gatherTargets(ctx) {
   const { params, token } = ctx;
   const max = Number(params.maxMessages) > 0 ? Number(params.maxMessages) : Infinity;
@@ -156,17 +156,17 @@ async function gatherTargets(ctx) {
       if (seen.has(id)) continue;
       await ctx.pace();
       try {
-        // around=<id>&limit=1 renvoie le message ciblé (l'accès direct est réservé aux bots)
+        // around=<id>&limit=1 returns the target message (direct access is reserved for bots)
         const { data } = await discordFetch(token, 'GET', `/channels/${params.channelId}/messages`,
           { query: { around: id, limit: params.verifyPages ? 100 : 1 }, onRateLimit: ctx.onRateLimit, shouldStop: ctx.shouldStop });
         for (const raw of data ?? []) {
           if (!wanted.has(raw.id) || seen.has(raw.id)) continue;
           seen.add(raw.id);
           if (raw.author?.id === ctx.me) out.push(normalizeMessage({ ...raw, channel_id: raw.channel_id ?? params.channelId, guild_id: raw.guild_id ?? params.guildId }));
-          else { ctx.stats.failed++; ctx.log('warn', `Message ${raw.id} : auteur différent, ignoré`); }
+          else { ctx.stats.failed++; ctx.log('warn', `Message ${raw.id}: different author, skipped`); }
         }
         if (!seen.has(id)) {
-          seen.add(id); ctx.log('warn', `Message ${id} introuvable, ignoré`);
+          seen.add(id); ctx.log('warn', `Message ${id} not found, skipped`);
           if (params.planId) ctx.stats.skipped = (ctx.stats.skipped || 0) + 1;
           else ctx.stats.failed++;
         }
@@ -178,25 +178,25 @@ async function gatherTargets(ctx) {
     }
     return out.sort((a, b) => cmpId(a.id, b.id));
   }
-  ctx.log('info', 'Recherche de mes messages (pagination par 25)');
+  ctx.log('info', 'Searching my messages (25 per page)');
   const found = await collectMessages(token, {
     guildId: params.guildId, channelId: params.channelId, authorId: ctx.me, content: params.content || undefined,
     minId: toSnowflake(params.after), maxId: toSnowflake(params.before),
   }, {
     max, shouldStop: ctx.shouldStop, pace: ctx.pace, onRateLimit: ctx.onRateLimit,
-    onPage: (count, total) => ctx.log('debug', `${count} messages collectés (total Discord ${total})`),
+    onPage: (count, total) => ctx.log('debug', `${count} messages collected (Discord total ${total})`),
   });
   return applyProtection(ctx, found);
 }
 
-/** Retire les messages protégés (épinglés, mots exclus...) et les compte comme ignorés. */
+/** Remove protected messages (pinned, excluded words, etc.) and count them as skipped. */
 function applyProtection(ctx, messages) {
   if (!ctx.protect) return messages;
   const kept = messages.filter(ctx.protect);
   const skipped = messages.length - kept.length;
   if (skipped) {
     ctx.stats.skipped = (ctx.stats.skipped || 0) + skipped;
-    ctx.log('info', `${skipped} message(s) protégé(s) par les filtres, conservé(s)`);
+    ctx.log('info', `${skipped} message(s) protected by filters, kept`);
   }
   return kept;
 }
@@ -210,15 +210,11 @@ function archiveOnce(ctx, msg, action, meta) {
 
 const doDelete = (ctx, messages) => deleteBatch(ctx, messages);
 
-/**
- * Supprime un lot : bulk-delete (< 14 j, par salon, lots de 100) puis suppression unitaire
- * (concurrence = speed.concurrency, pacer global). Archive AVANT l'action ; met à jour stats/progression.
- * `ctx.bulkOk` passe à false si Discord refuse le bulk (DM, permission) -> repli unitaire.
- */
+/** Delete a batch: bulk-delete (< 14 days, per channel, batches of 100), then individual deletion (concurrency = speed.concurrency, global pacer). Archive BEFORE the action; update statistics/progress. ctx.bulkOk becomes false if Discord refuses bulk deletion (DM, permissions), falling back to individual deletion. */
 async function deleteBatch(ctx, messages) {
   const { params, token, stats } = ctx;
   const cutoff = Date.now() - BULK_MAX_AGE_MS;
-  const single = messages.filter((m) => m.timestamp <= cutoff || ctx.bulkOk === false); // anciens : unitaire obligatoire
+  const single = messages.filter((m) => m.timestamp <= cutoff || ctx.bulkOk === false); // older messages require individual deletion
   const byChannel = new Map();
   for (const m of messages) {
     if (m.timestamp <= cutoff || ctx.bulkOk === false) continue;
@@ -233,7 +229,7 @@ async function deleteBatch(ctx, messages) {
       const batch = list.slice(i, i + 100);
       if (batch.length < 2) { single.push(...batch); continue; }
       await ctx.pace();
-      batch.forEach((m) => archiveOnce(ctx, m, 'delete', { via: 'bulk' })); // archive AVANT l'action
+      batch.forEach((m) => archiveOnce(ctx, m, 'delete', { via: 'bulk' })); // archive BEFORE the action
       try {
         await discordFetch(token, 'POST', `/channels/${channelId}/messages/bulk-delete`,
           { body: { messages: batch.map((m) => m.id) }, onRateLimit: ctx.onRateLimit, shouldStop: ctx.shouldStop });
@@ -241,21 +237,21 @@ async function deleteBatch(ctx, messages) {
         stats.progress += batch.length;
       } catch (e) {
         if (e.status === 401) throw e;
-        if (e.status === 499) return; // annulé pendant l'attente du quota : rien n'a été envoyé
+        if (e.status === 499) return; // cancelled while waiting for quota: nothing was sent
         if ([400, 403, 404, 405].includes(e.status)) {
-          ctx.log('warn', `bulk-delete refusé (${e.status}) : repli sur suppression unitaire`);
+          ctx.log('warn', `bulk-delete refused (${e.status}): falling back to single deletes`);
           ctx.bulkOk = false;
-          single.push(...list.slice(i)); // ce lot et les suivants
+          single.push(...list.slice(i)); // this batch and subsequent batches
           break;
         }
-        ctx.log('error', `bulk-delete échoué : ${e.message}`);
+        ctx.log('error', `bulk-delete failed: ${e.message}`);
         stats.failed += batch.length;
         stats.progress += batch.length;
       }
       ctx.save();
     }
   }
-  single.sort((a, b) => cmpId(a.id, b.id)); // du plus ancien au plus récent
+  single.sort((a, b) => cmpId(a.id, b.id)); // oldest to newest
 
   await runPool(single, ctx.speed.concurrency, ctx.shouldStop, async (m) => {
     await ctx.pace();
@@ -266,24 +262,24 @@ async function deleteBatch(ctx, messages) {
       stats.deleted++;
     } catch (e) {
       if (e.status === 401) throw e;
-      if (e.status === 499) return; // annulé avant l'envoi
-      if (e.status === 404) { stats.deleted++; ctx.log('info', `Message ${m.id} déjà supprimé`); } // 404 = déjà parti
-      else { stats.failed++; ctx.log('error', `Suppression ${m.id} échouée : ${e.message}`); }
+      if (e.status === 499) return; // cancelled before sending
+      if (e.status === 404) { stats.deleted++; ctx.log('info', `Message ${m.id} already deleted`); } // 404 = already gone
+      else { stats.failed++; ctx.log('error', `Delete ${m.id} failed: ${e.message}`); }
     }
     stats.progress++;
     ctx.save();
   });
 }
 
-// ---- méthode historique (C4) : pagination du salon 100/page, filtre local, streaming page -> suppression -> curseur.
-/** Défaut pour scope all/range ; la recherche reste pour les filtres de contenu, les ids explicites ou method:'search'. */
+// ---- history method (C4): channel pagination at 100/page, local filtering, stream page -> deletion -> cursor.
+/** Default for scope all/range; search remains available for content filters, explicit IDs, or method:'search'. */
 export function useHistory(params) {
   if (Array.isArray(params.messageIds) && params.messageIds.length) return false;
   if (params.method === 'search' || params.content) return false;
   return !!(params.channelId || params.guildId);
 }
 
-/** Salons textuels d'une guilde, par position. */
+/** Text channels in a guild, ordered by position. */
 async function listGuildChannels(ctx) {
   await ctx.pace();
   const { data } = await discordFetch(ctx.token, 'GET', `/guilds/${ctx.params.guildId}/channels`, { onRateLimit: ctx.onRateLimit });
@@ -294,20 +290,20 @@ async function listGuildChannels(ctx) {
 async function runHistoryDelete(ctx) {
   const { params } = ctx;
   const max = Number(params.maxMessages) > 0 ? Number(params.maxMessages) : Infinity;
-  const lower = toSnowflake(params.after); // exclusif
-  const upper = toSnowflake(params.before); // exclusif
+  const lower = toSnowflake(params.after); // exclusive
+  const upper = toSnowflake(params.before); // exclusive
   let channels;
   if (params.channelId) channels = [{ id: String(params.channelId), name: params.channelName }];
   else {
     channels = await listGuildChannels(ctx);
-    ctx.log('info', `Serveur entier : ${channels.length} salons textuels, traités l'un après l'autre`);
+    ctx.log('info', `Whole server: ${channels.length} text channels, processed one after another`);
   }
-  ctx.log('info', `Méthode historique (${HISTORY_PAGE} messages/page, filtre local auteur + dates)`);
-  let matched = 0; // seul état global : aucun tableau de messages cumulé, une page en mémoire à la fois
+  ctx.log('info', `History method (${HISTORY_PAGE} messages/page, local author + date filter)`);
+  let matched = 0; // only global state: no accumulated message array, one page in memory at a time
   for (const ch of channels) {
     if (ctx.shouldStop() || matched >= max) break;
-    ctx.bulkOk = true; // la permission bulk dépend du salon
-    let cursor = upper; // `before` : plus petit id déjà parcouru
+    ctx.bulkOk = true; // bulk deletion permission depends on the channel
+    let cursor = upper; // before: lowest ID already visited
     let pages = 0;
     while (!ctx.shouldStop() && matched < max) {
       await ctx.pace();
@@ -317,7 +313,7 @@ async function runHistoryDelete(ctx) {
           { query: { limit: HISTORY_PAGE, before: cursor }, onRateLimit: ctx.onRateLimit }));
       } catch (e) {
         if (e.status === 401 || params.channelId) throw e;
-        ctx.log('warn', `Salon ${ch.name ?? ch.id} ignoré : ${e.message}`);
+        ctx.log('warn', `Channel ${ch.name ?? ch.id} skipped: ${e.message}`);
         break;
       }
       if (!Array.isArray(raw) || !raw.length) break;
@@ -334,14 +330,14 @@ async function runHistoryDelete(ctx) {
         store.updateJob(ctx.jobId, { total: matched });
         await deleteBatch(ctx, mine);
         ctx.save();
-        if (ctx.shouldStop()) break; // curseur non avancé : la page serait revue à la reprise
+        if (ctx.shouldStop()) break; // cursor not advanced: this page will be revisited on resume
       }
       cursor = minId;
       store.updateJob(ctx.jobId, { cursor: JSON.stringify({ channelId: ch.id, before: cursor }) });
       ctx.archived.clear();
-      if (raw.length < HISTORY_PAGE || (lower && cmpId(minId, lower) <= 0)) break; // début du salon ou borne dépassée
+      if (raw.length < HISTORY_PAGE || (lower && cmpId(minId, lower) <= 0)) break; // start of channel or boundary crossed
     }
-    ctx.log('debug', `Salon ${ch.name ?? ch.id} : ${pages} page(s) parcourue(s)`);
+    ctx.log('debug', `Channel ${ch.name ?? ch.id}: ${pages} page(s) scanned`);
   }
 }
 
@@ -349,10 +345,10 @@ async function doEdit(ctx, messages) {
   const { params, token, stats } = ctx;
   await runPool(messages, ctx.speed.concurrency, ctx.shouldStop, async (m) => {
     stats.progress++;
-    if (m.authorId !== ctx.me) { stats.failed++; ctx.log('warn', `Message ${m.id} : pas le mien, ignoré`); ctx.save(); return; }
+    if (m.authorId !== ctx.me) { stats.failed++; ctx.log('warn', `Message ${m.id}: not mine, skipped`); ctx.save(); return; }
     let next;
     try { next = applyEdit(m.content, params.edit); } catch (e) { stats.failed++; ctx.log('error', e.message); ctx.save(); return; }
-    if (next === m.content) { ctx.log('debug', `Message ${m.id} : aucun changement`); ctx.save(); return; }
+    if (next === m.content) { ctx.log('debug', `Message ${m.id}: no change`); ctx.save(); return; }
     await ctx.pace();
     archiveOnce(ctx, m, 'edit', { newContent: next });
     try {
@@ -360,9 +356,9 @@ async function doEdit(ctx, messages) {
       stats.edited++;
     } catch (e) {
       if (e.status === 401) throw e;
-      if (e.status === 499) return; // annulé avant l'envoi
+      if (e.status === 499) return; // cancelled before sending
       stats.failed++;
-      ctx.log('error', `Édition ${m.id} échouée : ${e.message}`);
+      ctx.log('error', `Edit ${m.id} failed: ${e.message}`);
     }
     ctx.save();
   });

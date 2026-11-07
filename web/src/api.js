@@ -12,12 +12,12 @@ async function request(method, path, body) {
   try {
     res = await fetch(BASE + path, {
       method,
-      // X-Forget-Request : exigé par le serveur pour toute écriture (protection CSRF, voir server/src/security.mjs).
+      // X-Forget-Request: required by the server for all writes (CSRF protection, see server/src/security.mjs).
       headers: { 'X-Forget-Request': '1', ...(body !== undefined ? { 'Content-Type': 'application/json' } : {}) },
       body: body !== undefined ? JSON.stringify(body) : undefined,
     });
   } catch {
-    throw new ApiError('API indisponible', 0);
+    throw new ApiError("API unavailable", 0);
   }
   let data = null;
   const text = await res.text();
@@ -29,7 +29,7 @@ async function request(method, path, body) {
     }
   }
   if (!res.ok) {
-    const msg = data && data.error ? data.error : res.status >= 500 ? 'API indisponible' : `Erreur ${res.status}`;
+    const msg = data && data.error ? data.error : res.status >= 500 ? "API unavailable" : `Error ${res.status}`;
     throw new ApiError(msg, res.status);
   }
   return data;
@@ -41,7 +41,7 @@ export const patch = (p, b) => request('PATCH', p, b);
 export const put = (p, b) => request('PUT', p, b);
 export const del = (p) => request('DELETE', p);
 
-// Construit une query string en ignorant les valeurs vides.
+// Builds a query string, skipping empty values.
 export function qs(params) {
   const sp = new URLSearchParams();
   Object.entries(params || {}).forEach(([k, v]) => {
@@ -51,7 +51,7 @@ export function qs(params) {
   return s ? `?${s}` : '';
 }
 
-// ---- Contrat historique (SPEC.md) ----
+// ---- Legacy contract (SPEC.md) ----
 export const health = () => get('/health');
 
 export const listProfiles = () => get('/profiles');
@@ -87,11 +87,11 @@ export const patchSettings = (b) => patch('/settings', b);
 const D = '/discord';
 
 /**
- * Statut Discord avec repli propre :
- *  - connecté              -> { state:'connected', ...status }
+ * Discord status with graceful fallback:
+ *  - connected             -> { state:'connected', ...status }
  *  - 409 / connected:false -> { state:'disconnected' }
- *  - 404 / 501 / 503       -> { state:'unavailable' } (module Discord absent)
- *  - réseau coupé          -> { state:'apidown' }
+ *  - 404 / 501 / 503       -> { state:'unavailable' } (Discord module missing)
+ *  - network unavailable  -> { state:'apidown' }
  */
 export async function discordStatus() {
   try {
@@ -127,14 +127,14 @@ export const discordArchiveExportUrl = (format) => `${BASE}${D}/archive/export?f
 export const discordDisappearing = () => get(`${D}/disappearing`);
 export const discordSetDisappearing = (b) => patch(`${D}/disappearing`, b);
 
-// ---- Purges planifiées (SPEC-V4 B2) ----
+// ---- Scheduled purges (SPEC-V4 B2) ----
 export const discordPurges = () => get(`${D}/purges`);
 export const discordCreatePurge = (b) => post(`${D}/purges`, b);
 export const discordRunPurge = (id) => post(`${D}/purges/${id}/run`);
 export const discordCancelPurge = (id) => del(`${D}/purges/${id}`);
 
-// ---- Scan massif des brokers (SPEC-V4 B3) ----
+// ---- Bulk broker scan (SPEC-V4 B3) ----
 export const scanAllClaws = (profileId) => post('/claws/scan-all', { profileId });
 
-// Indique si une erreur API signifie « endpoint absent » (404/501/503) : dégradation propre côté UI.
+// Checks whether an API error means a missing endpoint (404/501/503) for graceful UI fallback.
 export const isMissingEndpoint = (e) => !!e && (e.status === 404 || e.status === 501 || e.status === 503);

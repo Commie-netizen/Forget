@@ -15,11 +15,11 @@ app.commandLine.appendSwitch('disable-features', 'Translate,MediaRouter,Optimiza
 app.commandLine.appendSwitch('disable-background-networking');
 app.commandLine.appendSwitch('no-proxy-server');
 
-// FORGET_APPDATA_DIR (tests uniquement) remplace %APPDATA%.
+// FORGET_APPDATA_DIR (tests only) overrides %APPDATA%.
 const appDataDir = process.env.FORGET_APPDATA_DIR || app.getPath('appData');
 const forgetDb = path.join(appDataDir, 'forget-desktop', 'data', 'forget.sqlite');
 if (smoke) {
-  // Le smoke ne touche pas aux donnees de l'utilisateur : base jetable.
+  // Smoke tests use a disposable database and leave user data untouched.
   process.env.FORGET_DB_PATH = path.join(app.getPath('temp'), `forget-smoke-${process.pid}.sqlite`);
 } else if (!process.env.FORGET_DB_PATH) {
   process.env.FORGET_DB_PATH = forgetDb;
@@ -30,9 +30,9 @@ let server = null;
 let win = null;
 let splash = null;
 let splashTimer = null;
-let splashShownAt = 0; // pour le hold de test (FORGET_SPLASH_HOLD_MS)
+let splashShownAt = 0; // for the test hold (FORGET_SPLASH_HOLD_MS)
 
-// Splash : charge en data: URL (le filtre reseau de la session par defaut n'autorise pas file://).
+// Splash: loaded as a data: URL (the default session network filter does not allow file://).
 function openSplash() {
   splashShownAt = Date.now();
   splash = new BrowserWindow({
@@ -57,7 +57,7 @@ function closeSplash() {
   if (splash) { try { splash.destroy(); } catch { /* ignore */ } splash = null; }
 }
 
-// Connexion Discord integree : fenetre isolee, lit uniquement le localStorage de discord.com.
+// Integrated Discord login: isolated window, reads only discord.com localStorage.
 function isDiscordHost(u) {
   try {
     const x = new URL(u);
@@ -78,7 +78,7 @@ function openDiscordLogin() {
     let timer = null;
     let checking = false;
     const lw = new BrowserWindow({
-      width: 520, height: 760, parent: win || undefined, modal: !!win, title: 'Connexion Discord',
+      width: 520, height: 760, parent: win || undefined, modal: !!win, title: 'Discord login',
       backgroundColor: '#0b0d10', autoHideMenuBar: true, minimizable: false,
       icon: path.join(__dirname, 'assets', 'icon.ico'),
       webPreferences: {
@@ -87,7 +87,7 @@ function openDiscordLogin() {
       },
     });
     const wc = lw.webContents;
-    // Pas de prompts Windows Hello / WebAuthn / notifications pendant la connexion.
+    // No Windows Hello / WebAuthn / notification prompts during login.
     try {
       wc.session.setPermissionRequestHandler((_w, _p, cb) => cb(false));
       wc.session.setPermissionCheckHandler(() => false);
@@ -116,16 +116,16 @@ function openDiscordLogin() {
       checking = true;
       try {
         const raw = await wc.executeJavaScript("localStorage.getItem('token')", true);
-        // Discord stocke le token entre guillemets (JSON) dans localStorage.
+        // Discord stores the token in quotes (JSON) in localStorage.
         let token = typeof raw === 'string' ? raw : '';
-        try { const j = JSON.parse(token); if (typeof j === 'string') token = j; } catch { /* valeur brute */ }
+        try { const j = JSON.parse(token); if (typeof j === 'string') token = j; } catch { /*raw value */ }
         token = token.trim();
         if (token) {
-          // Le token est transmis au serveur (chiffre DPAPI) : la session web Discord n'a pas a rester sur disque.
+          // The token is passed to the server (DPAPI encrypted): the Discord web session need not remain on disk.
           wc.session.clearStorageData().catch(() => { /* best effort */ });
           finish({ token }, true);
         }
-      } catch { /* page pas prete : nouvel essai au prochain evenement/tick */ } finally { checking = false; }
+      } catch { /*page not ready: retry on the next event/tick */ } finally { checking = false; }
     }
     wc.setWindowOpenHandler(() => ({ action: 'deny' }));
     wc.on('will-navigate', guard);
@@ -134,7 +134,7 @@ function openDiscordLogin() {
     wc.on('did-navigate-in-page', check);
     wc.on('did-finish-load', check);
     lw.on('closed', onClosed);
-    timer = setInterval(check, 1500); // le token apparait parfois apres le chargement de l'app
+    timer = setInterval(check, 1500); // the token sometimes appears after the app loads
     lw.loadURL('https://discord.com/login').catch((err) => {
       if (!done && !String(err).includes('ERR_ABORTED')) finish({ error: String((err && err.message) || err) }, true);
     });
@@ -155,22 +155,22 @@ async function start() {
   globalThis.__FORGET_SOCIAL_WINDOW = require('./social-windows.js').openSocialWindow;
   globalThis.__FORGET_TIKTOK = require('./tiktok-window.js');
   globalThis.__FORGET_OAUTH_WINDOW = require('./oauth-window.js').runOAuthWindow;
-  // Mise a jour (Forget.exe portable uniquement) : le nouvel executable verifie (SHA-256) remplace le fichier
-  // lance par l'utilisateur des que celui-ci est libere (fermeture de Forget), puis Forget est relance.
-  // PORTABLE_EXECUTABLE_FILE est defini par le lanceur portable d'electron-builder (templates/nsis/portable.nsi).
+  // Update (portable Forget.exe only): the new verified executable (SHA-256) replaces the file
+  // launched by the user as soon as it is released (Forget closes), then Forget restarts.
+  // PORTABLE_EXECUTABLE_FILE is set by the electron-builder portable launcher (templates/nsis/portable.nsi).
   const portableExe = process.env.PORTABLE_EXECUTABLE_FILE;
   if (portableExe && /\.exe$/i.test(portableExe)) {
     globalThis.__FORGET_INSTALL_UPDATE = async (file) => {
       const dir = path.resolve(require('node:os').tmpdir(), 'forget-update');
       const full = path.resolve(file);
       const target = path.resolve(portableExe);
-      const unsafe = (p) => /["%^&|<>\r\n]/.test(p); // chemins injectes dans un script cmd
+      const unsafe = (p) => /["%^&|<>\r\n]/.test(p); // paths inserted into a cmd script
       if (path.dirname(full) !== dir || !/\.exe$/i.test(full) || !fs.existsSync(full) || unsafe(full)) throw new Error('Fichier de mise a jour refuse');
-      if (!fs.existsSync(target) || unsafe(target)) throw new Error('Emplacement de Forget.exe introuvable ou non pris en charge');
+      if (!fs.existsSync(target) || unsafe(target)) throw new Error('Forget.exe location not found or not supported');
       const script = path.join(dir, `apply-update-${process.pid}.cmd`);
       fs.writeFileSync(script, [
         '@echo off', 'set /a n=0',
-        ':retry', // l'executable reste verrouille jusqu'a la fermeture du lanceur portable
+        ':retry', // the executable remains locked until the portable launcher closes
         `move /Y "${full}" "${target}" >nul 2>&1 && goto done`,
         'set /a n+=1', 'if %n% geq 120 goto relaunch', 'ping -n 2 127.0.0.1 >nul', 'goto retry',
         ':done', ':relaunch', `start "" "${target}"`, 'del "%~f0"', '',
@@ -183,7 +183,7 @@ async function start() {
       setTimeout(() => { shutdown(); app.quit(); }, 500);
     };
   }
-  // Hooks lus par le serveur : definis AVANT l'import du bundle.
+  // Hooks read by the server: defined BEFORE importing the bundle.
   globalThis.__FORGET_LOGIN_WINDOW = () => openDiscordLogin();
   if (safeStorage.isEncryptionAvailable()) {
     globalThis.__FORGET_CIPHER = {
@@ -197,10 +197,10 @@ async function start() {
   const origin = `http://127.0.0.1:${server.port}`;
   const isLocal = (u) => u === origin || u.startsWith(origin + '/');
   ipcMain.handle('forget:pick-file', async (event, kind) => {
-    if (!win || event.sender !== win.webContents || event.senderFrame !== win.webContents.mainFrame || !isLocal(event.senderFrame.url)) throw new Error('Fenêtre non autorisée');
-    if (!['export', 'engine-db', 'export-dir'].includes(kind)) throw new Error('Type de source invalide');
+    if (!win || event.sender !== win.webContents || event.senderFrame !== win.webContents.mainFrame || !isLocal(event.senderFrame.url)) throw new Error('Window not allowed');
+    if (!['export', 'engine-db', 'export-dir'].includes(kind)) throw new Error('Invalid source type');
     const result = await dialog.showOpenDialog(win, {
-      title: 'Choisir la source à importer',
+      title: 'Choose the source to import',
       properties: [kind === 'export-dir' ? 'openDirectory' : 'openFile'],
       filters: kind === 'export-dir' ? [] : [{ name: kind === 'export' ? 'Export Discord' : 'Base Forget Engine', extensions: kind === 'export' ? ['zip'] : ['db', 'sqlite', 'sqlite3'] }],
     });
@@ -220,7 +220,7 @@ async function start() {
   win = new BrowserWindow({
     width: 1440, height: 900, minWidth: 1024, minHeight: 700,
     backgroundColor: '#0b0d10', title: 'Forget',
-    show: false, // affichee apres le chargement (le splash couvre l attente)
+    show: false, // shown after loading (splash covers the wait)
     icon: path.join(__dirname, 'assets', 'icon.ico'),
     webPreferences: {
       preload: path.join(__dirname, 'preload.js'),
@@ -228,7 +228,7 @@ async function start() {
       devTools: dev,
     },
   });
-  win.on('page-title-updated', (e) => e.preventDefault()); // le titre de fenetre reste « Forget »
+  win.on('page-title-updated', (e) => e.preventDefault()); // the window title stays "Forget"
   win.webContents.setWindowOpenHandler(() => ({ action: 'deny' }));
   win.webContents.on('will-navigate', (e, url) => { if (!isLocal(url)) e.preventDefault(); });
   win.on('closed', () => { win = null; });
@@ -239,7 +239,7 @@ async function start() {
   });
   win.loadURL(origin + '/');
   await loaded;
-  // Hold de test : laisse le splash visible N ms (capture de verification uniquement).
+  // Test hold: keep the splash visible for N ms (verification screenshots only).
   const holdMs = Number(process.env.FORGET_SPLASH_HOLD_MS || 0);
   if (holdMs > 0 && splashShownAt) {
     const wait = holdMs - (Date.now() - splashShownAt);

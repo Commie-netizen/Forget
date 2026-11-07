@@ -8,9 +8,9 @@ import Badge from '../components/Badge.jsx';
 import { fmtDate } from '../lib.js';
 
 const FREQ = [
-  { value: 'hour', label: 'Toutes les heures', cron: '0 * * * *' },
-  { value: 'day', label: 'Tous les jours', cron: '0 0 * * *' },
-  { value: 'week', label: 'Toutes les semaines', cron: '0 0 * * 1' },
+  { value: 'hour', label: "Hourly", cron: '0 * * * *' },
+  { value: 'day', label: "Daily", cron: '0 0 * * *' },
+  { value: 'week', label: "Weekly", cron: '0 0 * * 1' },
 ];
 const cronLabel = (c) => FREQ.find((f) => f.cron === c)?.label || c;
 
@@ -35,11 +35,11 @@ export default function Schedule() {
   const list = Array.isArray(schedules.data) ? schedules.data : [];
 
   const nameOf = (s) => {
-    if (s.kind === 'discord') return 'Discord · archive des messages';
+    if (s.kind === 'discord') return "Discord · message archive";
     const src = s.kind === 'axe' ? axes : claws;
     return src.find((x) => x.id === s.targetId)?.name || s.targetId;
   };
-  const kindLabel = (k) => (k === 'axe' ? 'Archive' : k === 'discord' ? 'Scan Discord' : 'Scan broker');
+  const kindLabel = (k) => (k === 'axe' ? 'Archive' : k === 'discord' ? "Discord scan" : "Broker scan");
 
   async function submit(e) {
     e.preventDefault();
@@ -47,12 +47,12 @@ export default function Schedule() {
     let body;
     const cron = FREQ.find((f) => f.value === freq).cron;
     if (kind === 'discord') {
-      // Réutilise l'axe Discord du catalogue s'il existe, sinon tente un type dédié.
+      // Reuse the Discord axe from the catalog if available; otherwise try a dedicated type.
       body = discordAxe ? { kind: 'axe', targetId: discordAxe.id, cron } : { kind: 'discord', targetId: 'messages', cron };
     } else {
       const target = targetId || options[0]?.id;
       if (!target) {
-        setError('Aucune cible disponible.');
+        setError("No targets available.");
         return;
       }
       body = { kind, targetId: target, cron };
@@ -62,7 +62,7 @@ export default function Schedule() {
       await api.createSchedule(body);
       await schedules.reload(true);
     } catch (err) {
-      setError(kind === 'discord' && err.status === 400 ? 'Le serveur ne gère pas encore les planifications Discord.' : err.message);
+      setError(kind === 'discord' && err.status === 400 ? "The server does not support Discord schedules yet." : err.message);
     } finally {
       setBusy(false);
     }
@@ -79,12 +79,12 @@ export default function Schedule() {
 
   return (
     <>
-      <PageHeader title="Schedule" subtitle="Automatisez vos scans et vos archives." />
+      <PageHeader title="Schedule" subtitle="Automate your scans and archives." />
       <Notice tone="error">{error || schedules.error}</Notice>
       <div className="cols">
-        <Card title={`Planifications (${list.length})`}>
+        <Card title={`Schedules (${list.length})`}>
           {list.length === 0 ? (
-            <EmptyState icon="clock" title="Aucune planification">Créez-en une avec le formulaire.</EmptyState>
+            <EmptyState icon="clock" title="No schedules">Create one using the form.</EmptyState>
           ) : (
             <ul className="list">
               {list.map((s) => (
@@ -92,40 +92,40 @@ export default function Schedule() {
                   <div className="grow">
                     <strong>{nameOf(s)}</strong> <Badge>{kindLabel(s.kind)}</Badge>
                     <div className="muted small">
-                      {cronLabel(s.cron)} · dernière : {fmtDate(s.lastRunAt)} · prochaine : {fmtDate(s.nextRunAt)}
+                      {cronLabel(s.cron)} · last: {fmtDate(s.lastRunAt)} · next: {fmtDate(s.nextRunAt)}
                     </div>
                   </div>
-                  <button type="button" className="btn sm danger" onClick={() => remove(s.id)}>Supprimer</button>
+                  <button type="button" className="btn sm danger" onClick={() => remove(s.id)}>Delete</button>
                 </li>
               ))}
             </ul>
           )}
         </Card>
-        <Card title="Nouvelle planification">
+        <Card title="New schedule">
           <form className="stack" onSubmit={submit}>
             <Select
               label="Type"
               value={kind}
               onChange={(v) => { setKind(v); setTargetId(''); }}
               options={[
-                { value: 'scan', label: 'Scan data broker' },
-                { value: 'axe', label: 'Archive réseau social' },
-                { value: 'discord', label: 'Scan Discord', disabled: discord.state !== 'connected' },
+                { value: 'scan', label: "Data broker scan" },
+                { value: 'axe', label: "Social media archive" },
+                { value: 'discord', label: "Discord scan", disabled: discord.state !== 'connected' },
               ]}
-              hint={discord.state !== 'connected' ? 'Le scan Discord nécessite un compte connecté.' : undefined}
+              hint={discord.state !== 'connected' ? "Discord scanning requires a connected account." : undefined}
             />
             {kind !== 'discord' && (
               <Select
-                label="Cible"
+                label="Target"
                 value={targetId || options[0]?.id || ''}
                 onChange={setTargetId}
-                options={options.length ? options.map((o) => ({ value: o.id, label: o.name })) : [{ value: '', label: 'Aucune cible' }]}
+                options={options.length ? options.map((o) => ({ value: o.id, label: o.name })) : [{ value: '', label: "No target" }]}
               />
             )}
-            <Select label="Fréquence" value={freq} onChange={setFreq} options={FREQ} />
-            <p className="muted small">Expression : <span className="mono">{FREQ.find((f) => f.value === freq).cron}</span></p>
+            <Select label="Frequency" value={freq} onChange={setFreq} options={FREQ} />
+            <p className="muted small">Expression: <span className="mono">{FREQ.find((f) => f.value === freq).cron}</span></p>
             <div className="actions">
-              <button type="submit" className="btn primary" disabled={busy}>Planifier</button>
+              <button type="submit" className="btn primary" disabled={busy}>Schedule</button>
             </div>
           </form>
         </Card>

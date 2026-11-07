@@ -1,4 +1,4 @@
-// Routeur Hono monté sur /api/discord.
+// Hono router mounted at /api/discord.
 import { Hono } from 'hono';
 import * as store from './store.mjs';
 import { discordFetch, DiscordError, rateLimitStatus } from './http.mjs';
@@ -11,12 +11,12 @@ import { startDisappearing, stopDisappearing, disappearingStatus, SCOPES } from 
 
 const publicUser = (u) => ({ id: u.id, username: u.username, avatar: u.avatar ?? null });
 
-// Appel REST avec le token stocké.
+// REST call using the stored token.
 const call = (method, path, opts) => discordFetch(store.getToken().token, method, path, opts);
 
-// Garde : 409 si aucun token n'est stocké.
+// Guard: 409 if no token is stored.
 const needConn = async (c, next) => {
-  if (!store.getToken()) return c.json({ error: 'Discord non connecté' }, 409);
+  if (!store.getToken()) return c.json({ error: 'Discord is not connected' }, 409);
   await next();
 };
 
@@ -25,7 +25,7 @@ function errorResponse(c, e) {
     const st = [401, 403, 404].includes(e.status) ? e.status : 502;
     return c.json({ error: e.message, discordStatus: e.status }, st);
   }
-  return c.json({ error: e.message || 'erreur interne' }, e.status === 400 ? 400 : 500);
+  return c.json({ error: e.message || 'internal error' }, e.status === 400 ? 400 : 500);
 }
 const wrap = (fn) => async (c) => { try { return await fn(c); } catch (e) { return errorResponse(c, e); } };
 const body = (c) => c.req.json().catch(() => ({}));
@@ -41,7 +41,7 @@ function status() {
   return out;
 }
 
-// Paramètres communs aux jobs : cible + vitesse.
+// Shared job parameters: target and speed.
 function jobParams(b) {
   const p = {
     channelId: b.channelId ? String(b.channelId) : undefined, guildId: b.guildId ? String(b.guildId) : undefined,
@@ -51,18 +51,18 @@ function jobParams(b) {
     content: typeof b.content === 'string' && b.content ? b.content : undefined,
     method: b.method === 'search' || b.method === 'history' ? b.method : undefined, speed: b.speed ?? { mode: 'safe' },
   };
-  p.speed = resolveSpeed(p.speed); // valeurs effectives persistées
+  p.speed = resolveSpeed(p.speed); // persist effective values
   Object.assign(p, protectionParams(b));
   return p;
 }
 
-// Valide un token via /users/@me, le stocke (chiffré si cipher) et relance le mode disparition si actif.
+// Validate a token via /users/@me, store it (encrypted if a cipher is available), and restart disappearing mode if enabled.
 async function connectWithToken(c, token) {
   let user;
   try {
     user = (await discordFetch(token, 'GET', '/users/@me')).data;
   } catch (e) {
-    if (e instanceof DiscordError && e.status === 401) return c.json({ error: 'Token invalide' }, 401);
+    if (e instanceof DiscordError && e.status === 401) return c.json({ error: 'Invalid token' }, 401);
     throw e;
   }
   store.setToken({ token, userId: user.id, username: user.username, avatar: user.avatar });
@@ -80,21 +80,21 @@ export function buildDiscordRouter() {
   app.post('/token', wrap(async (c) => {
     const raw = (await body(c)).token;
     const token = typeof raw === 'string' ? raw.trim().replace(/^"+|"+$/g, '') : '';
-    if (!token) return bad(c, 'token requis');
+    if (!token) return bad(c, 'token is required');
     return connectWithToken(c, token);
   }));
 
-  // C1 : fenêtre de connexion fournie par Electron (hook global) ; 501 hors application de bureau.
+  // C1: login window provided by Electron (global hook); 501 outside the desktop app.
   app.post('/login-window', wrap(async (c) => {
     const hook = globalThis.__FORGET_LOGIN_WINDOW;
-    if (typeof hook !== 'function') return c.json({ error: "Connexion intégrée disponible dans l'application de bureau uniquement" }, 501);
-    if (loginInProgress) return c.json({ error: 'Une fenêtre de connexion est déjà ouverte' }, 409);
+    if (typeof hook !== 'function') return c.json({ error: 'Built-in login is only available in the desktop app' }, 501);
+    if (loginInProgress) return c.json({ error: 'A login window is already open' }, 409);
     loginInProgress = true;
     let res;
     try { res = await hook(); } finally { loginInProgress = false; }
-    if (res?.cancelled) return c.json({ error: 'Connexion annulée', cancelled: true }, 400);
+    if (res?.cancelled) return c.json({ error: 'Login cancelled', cancelled: true }, 400);
     if (res?.error || typeof res?.token !== 'string' || !res.token.trim()) {
-      return c.json({ error: String(res?.error || 'Aucun token reçu de la fenêtre de connexion') }, 500);
+      return c.json({ error: String(res?.error || 'No token received from the login window') }, 500);
     }
     return connectWithToken(c, res.token.trim().replace(/^"+|"+$/g, ''));
   }));
@@ -114,7 +114,7 @@ export function buildDiscordRouter() {
 
   app.get('/guilds', needConn, wrap(async (c) => {
     const guilds = (await call('GET', '/users/@me/guilds')).data;
-    // En parallèle : chaque guilde a son propre quota Discord, le limiteur partagé régule la cadence.
+    // In parallel: each guild has its own Discord quota; the shared limiter controls pacing.
     const out = await Promise.all(guilds.map(async (g) => {
       let channels = [];
       try {
@@ -122,7 +122,7 @@ export function buildDiscordRouter() {
           id: ch.id, name: ch.name, type: ch.type, parentId: ch.parent_id ?? null, position: ch.position ?? 0,
         }));
       } catch (e) {
-        if (e.status === 401) throw e; // autre erreur : guilde listée sans salons
+        if (e.status === 401) throw e; // other error: list the guild without channels
       }
       return { id: g.id, name: g.name, icon: g.icon ?? null, channels };
     }));
@@ -149,7 +149,7 @@ export function buildDiscordRouter() {
 
   app.get('/search', needConn, wrap(async (c) => {
     const q = c.req.query();
-    if (!q.guildId && !q.channelId) return bad(c, 'guildId ou channelId requis');
+    if (!q.guildId && !q.channelId) return bad(c, 'guildId or channelId is required');
     const offset = Math.max(parseInt(q.offset, 10) || 0, 0);
     const page = await searchPage(store.getToken().token, {
       guildId: q.guildId, channelId: q.channelId, authorId: q.authorId, content: q.content,
@@ -162,14 +162,14 @@ export function buildDiscordRouter() {
 
   app.post('/jobs/delete', needConn, wrap(async (c) => {
     const b = await body(c);
-    if (!b.channelId && !b.guildId) return bad(c, 'channelId ou guildId requis');
+    if (!b.channelId && !b.guildId) return bad(c, 'channelId or guildId is required');
     return c.json({ jobId: startDeleteJob(jobParams(b)) });
   }));
 
-  // Aperçu avant suppression : une seule requête de recherche (aucune action), estimation + exemples.
+  // Preview before deletion: one search request (no action), estimate and examples.
   app.post('/jobs/preview', needConn, wrap(async (c) => {
     const b = await body(c);
-    if (!b.channelId && !b.guildId) return bad(c, 'channelId ou guildId requis');
+    if (!b.channelId && !b.guildId) return bad(c, 'channelId or guildId is required');
     const p = jobParams(b);
     if (p.messageIds?.length) return c.json({ total: new Set(p.messageIds).size, exact: true, sample: [], filtered: false });
     const t = store.getToken();
@@ -184,14 +184,14 @@ export function buildDiscordRouter() {
 
   app.post('/jobs/edit', needConn, wrap(async (c) => {
     const b = await body(c);
-    if (!b.channelId) return bad(c, 'channelId requis');
+    if (!b.channelId) return bad(c, 'channelId is required');
     const err = validateEdit(b.edit);
     if (err) return bad(c, err);
     return c.json({ jobId: startEditJob({ ...jobParams(b), edit: b.edit }) });
   }));
 
-  // Lecture locale : fonctionne sans token.
-  // C3 : jobs en cours (queued/running) avec progression, pour la bannière globale.
+  // Local reads: work without a token.
+  // C3: active jobs (queued/running) with progress, for the global banner.
   app.get('/jobs/active', wrap((c) => {
     const jobs = store.listActiveJobs().map((j) => ({
       id: j.id, kind: j.kind, status: j.status, progress: j.progress ?? 0, total: j.total ?? 0,
@@ -202,32 +202,32 @@ export function buildDiscordRouter() {
   app.get('/jobs', wrap((c) => c.json(store.listJobs())));
   app.get('/jobs/:id', wrap((c) => {
     const job = store.getJob(c.req.param('id'));
-    if (!job) return c.json({ error: 'job introuvable' }, 404);
+    if (!job) return c.json({ error: 'job not found' }, 404);
     return c.json({ ...job, logs: store.getLogs(job.id) });
   }));
   app.post('/jobs/:id/cancel', wrap((c) => {
     const job = store.getJob(c.req.param('id'));
-    if (!job) return c.json({ error: 'job introuvable' }, 404);
+    if (!job) return c.json({ error: 'job not found' }, 404);
     cancelJob(job.id);
     return c.json({ ok: true });
   }));
 
-  // Purges reprenables (lecture locale sans token ; création et exécution manuelle exigent la connexion)
+  // Resumable purges (local reads without a token; creation and manual execution require a connection)
   app.post('/purges', needConn, wrap(async (c) => {
     const b = await body(c);
-    if (!b.channelId) return bad(c, 'channelId requis');
+    if (!b.channelId) return bad(c, 'channelId is required');
     return c.json({ id: startPurge(b) });
   }));
   app.get('/purges', needConn, wrap((c) => c.json(store.listPurges())));
   app.get('/purges/:id', needConn, wrap((c) => {
     const p = store.getPurge(c.req.param('id'));
-    return p ? c.json(p) : c.json({ error: 'purge introuvable' }, 404);
+    return p ? c.json(p) : c.json({ error: 'purge not found' }, 404);
   }));
   app.post('/purges/:id/run', needConn, wrap((c) => {
     const r = runPurgeNow(c.req.param('id'));
     return r.error ? c.json({ error: r.error }, r.status) : c.json({ ok: true });
   }));
-  app.delete('/purges/:id', wrap((c) => (cancelPurge(c.req.param('id')) ? c.json({ ok: true }) : c.json({ error: 'purge introuvable' }, 404))));
+  app.delete('/purges/:id', wrap((c) => (cancelPurge(c.req.param('id')) ? c.json({ ok: true }) : c.json({ error: 'purge not found' }, 404))));
 
   app.get('/archive/export', wrap((c) => {
     const rows = store.queryArchive({ ...c.req.query(), limit: 100000 });
@@ -245,18 +245,18 @@ export function buildDiscordRouter() {
     if (b.enabled !== undefined) patch.enabled = !!b.enabled;
     if (b.delaySec !== undefined) {
       const d = Number(b.delaySec);
-      if (!Number.isFinite(d) || d < 1) return bad(c, 'delaySec doit être >= 1');
-      patch.delaySec = Math.min(Math.floor(d), 2_000_000); // setTimeout plafonné ~24 j
+      if (!Number.isFinite(d) || d < 1) return bad(c, 'delaySec must be >= 1');
+      patch.delaySec = Math.min(Math.floor(d), 2_000_000); // setTimeout capped at about 24 days
     }
     if (b.scope !== undefined) {
-      if (!SCOPES.includes(b.scope)) return bad(c, `scope invalide (${SCOPES.join('|')})`);
+      if (!SCOPES.includes(b.scope)) return bad(c, `invalid scope (${SCOPES.join('|')})`);
       patch.scope = b.scope;
     }
     if (b.guildIds !== undefined) {
-      if (!Array.isArray(b.guildIds)) return bad(c, 'guildIds doit être un tableau');
+      if (!Array.isArray(b.guildIds)) return bad(c, 'guildIds must be an array');
       patch.guildIds = b.guildIds.map(String);
     }
-    if (patch.enabled && !store.getToken()) return c.json({ error: 'Discord non connecté' }, 409);
+    if (patch.enabled && !store.getToken()) return c.json({ error: 'Discord is not connected' }, 409);
     const next = store.setDisappearing(patch);
     if (next.enabled) startDisappearing(); else stopDisappearing();
     return c.json(disappearingStatus());

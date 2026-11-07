@@ -1,4 +1,4 @@
-// Forget 4.3 : mise à jour GitHub, OAuth X/Reddit (PKCE, refresh), TikTok reposts, protections Discord, réglages réservés.
+// Forget 4.3: GitHub updates, X/Reddit OAuth (PKCE, refresh), TikTok reposts, Discord protections, reserved settings.
 import assert from 'node:assert/strict';
 import { createHash } from 'node:crypto';
 import { mkdtempSync, readFileSync, existsSync, rmSync } from 'node:fs';
@@ -26,18 +26,18 @@ const newDb = () => { const db = new DatabaseSync(':memory:'); initStore(db); re
 const online = (db) => db.prepare("INSERT OR REPLACE INTO setting VALUES ('privacy.offline','false')").run();
 const until = async (fn, n = 20000) => { for (let i = 0; i < n; i++) { const v = await fn(); if (v) return v; await new Promise((r) => setImmediate(r)); } throw new Error('timeout'); };
 
-// ---------- Mises à jour ----------
-await check('versions : comparaison x.y.z et pré-versions', () => {
+// ---------- Updates ----------
+await check('versions: x.y.z comparison and prereleases', () => {
   assert.equal(compareVersions('4.3.0', '4.2.9'), 1);
   assert.equal(compareVersions('v4.3.0', '4.3.0'), 0);
   assert.equal(compareVersions('4.3.0-beta.1', '4.3.0'), -1);
   assert.equal(compareVersions('4.10.0', '4.9.9'), 1);
   assert.throws(() => compareVersions('abc', '1.0.0'));
 });
-await check('SHA256SUMS : extraction par nom de fichier', () => {
+await check('SHA256SUMS: lookup by file name', () => {
   const h = 'a'.repeat(64);
-  assert.equal(hashFor(`${'b'.repeat(64)}  autre.exe\n${h} *Forget-4.4.0.exe\n`, 'Forget-4.4.0.exe'), h);
-  assert.equal(hashFor('pas de hash', 'x.exe'), null);
+  assert.equal(hashFor(`${'b'.repeat(64)}  other.exe\n${h} *Forget-4.4.0.exe\n`, 'Forget-4.4.0.exe'), h);
+  assert.equal(hashFor('no hash', 'x.exe'), null);
 });
 
 const installer = Buffer.from('MZ fake installer bytes '.repeat(1000));
@@ -65,15 +65,15 @@ function githubMock({ sums = `${goodHash}  Forget-4.4.0.exe\n`, evilRedirect = f
   return { fetchImpl, calls };
 }
 
-await check('update : dépôt non configuré -> 409, format de dépôt validé', async () => {
+await check('update: repository not configured -> 409, repository format validated', async () => {
   const db = newDb();
-  const app = updateRouter(db, { fetchImpl: async () => { throw new Error('aucun appel attendu'); }, currentVersion: '4.3.0' });
+  const app = updateRouter(db, { fetchImpl: async () => { throw new Error('no call expected'); }, currentVersion: '4.3.0' });
   assert.equal((await call(app, 'POST', '/check')).status, 409);
-  assert.equal((await call(app, 'PUT', '/repo', { repo: 'pas un dépôt' })).status, 400);
+  assert.equal((await call(app, 'PUT', '/repo', { repo: 'not a repository' })).status, 400);
   assert.equal((await call(app, 'PUT', '/repo', { repo: 'https://github.com/me/forget.git' })).data.repo, 'me/forget');
 });
 
-await check('update : vérification, téléchargement suivi, SHA-256 vérifié, installeur confié à Electron', async () => {
+await check('update: check, followed download, SHA-256 verified, executable handed to Electron', async () => {
   const db = newDb(), dir = mkdtempSync(join(tmpdir(), 'forget-upd-'));
   const { fetchImpl, calls } = githubMock();
   let installed = null;
@@ -81,7 +81,7 @@ await check('update : vérification, téléchargement suivi, SHA-256 vérifié, 
   try {
     const app = updateRouter(db, { fetchImpl, downloadDir: dir, currentVersion: '4.3.0' });
     await call(app, 'PUT', '/repo', { repo: 'me/forget' });
-    assert.equal((await call(app, 'POST', '/install')).status, 409); // pas encore vérifié
+    assert.equal((await call(app, 'POST', '/install')).status, 409); // not yet verified
     const r = await call(app, 'POST', '/check');
     assert.equal(r.status, 200);
     assert.equal(r.data.available, true); assert.equal(r.data.latest, '4.4.0'); assert.equal(r.data.installable, true);
@@ -93,7 +93,7 @@ await check('update : vérification, téléchargement suivi, SHA-256 vérifié, 
   } finally { delete globalThis.__FORGET_INSTALL_UPDATE; rmSync(dir, { recursive: true, force: true }); }
 });
 
-await check('update : somme différente -> fichier supprimé, rien d’installé', async () => {
+await check('update: checksum mismatch -> file deleted, nothing installed', async () => {
   const db = newDb(), dir = mkdtempSync(join(tmpdir(), 'forget-upd-'));
   const { fetchImpl } = githubMock({ sums: `${'0'.repeat(64)}  Forget-4.4.0.exe\n` });
   let installed = false;
@@ -110,9 +110,9 @@ await check('update : somme différente -> fichier supprimé, rien d’installé
   } finally { delete globalThis.__FORGET_INSTALL_UPDATE; rmSync(dir, { recursive: true, force: true }); }
 });
 
-await check('update : redirection vers un hôte non autorisé refusée ; déjà à jour', async () => {
+await check('update: redirect to a disallowed host refused; already up to date', async () => {
   const db = newDb(), dir = mkdtempSync(join(tmpdir(), 'forget-upd-'));
-  globalThis.__FORGET_INSTALL_UPDATE = async () => { throw new Error('ne doit pas être appelé'); };
+  globalThis.__FORGET_INSTALL_UPDATE = async () => { throw new Error('must not be called'); };
   try {
     const { fetchImpl } = githubMock({ evilRedirect: true });
     const app = updateRouter(db, { fetchImpl, downloadDir: dir, currentVersion: '4.3.0' });
@@ -148,7 +148,7 @@ function oauthMock(now) {
   return { fetchImpl, seen };
 }
 
-await check('OAuth X : PKCE S256, state vérifié, jeton chiffré, renouvellement automatique', async () => {
+await check('OAuth X: PKCE S256, state checked, token encrypted, automatic renewal', async () => {
   const db = newDb(); online(db);
   let t = Date.now();
   const { fetchImpl, seen } = oauthMock();
@@ -160,7 +160,7 @@ await check('OAuth X : PKCE S256, state vérifié, jeton chiffré, renouvellemen
   };
   try {
     const app = socialRouter(db, { fetchImpl, now: () => t, sleep: async () => {} });
-    assert.equal((await call(app, 'POST', '/twitter/oauth', { clientId: 'x', redirectUri: 'http://127.0.0.1:53682/cb' })).status, 400); // client id trop court
+    assert.equal((await call(app, 'POST', '/twitter/oauth', { clientId: 'x', redirectUri: 'http://127.0.0.1:53682/cb' })).status, 400); // client ID too short
     assert.equal((await call(app, 'POST', '/twitter/oauth', { clientId: 'myclient', redirectUri: 'http://evil.example.com/cb' })).status, 400);
     const r = await call(app, 'POST', '/twitter/oauth', { clientId: 'myclient', redirectUri: 'http://127.0.0.1:53682/forget/callback' });
     assert.equal(r.status, 200, JSON.stringify(r.data));
@@ -173,25 +173,25 @@ await check('OAuth X : PKCE S256, state vérifié, jeton chiffré, renouvellemen
     assert.equal(createHash('sha256').update(ex.form.code_verifier).digest('base64url'), lastAuth.searchParams.get('code_challenge'));
     const secret = db.prepare("SELECT secret FROM socialAccount WHERE provider='twitter'").get().secret;
     assert(secret.startsWith('c:{') && !JSON.stringify(r.data).includes('ACCESS1'));
-    // 2 h plus tard : renouvellement avant l'appel API.
+    // 2 hours later: refresh before the API call.
     t += 7200 * 1000;
     assert.equal((await call(app, 'GET', '/twitter/posts')).status, 200);
     assert.equal(seen.token[1].form.grant_type, 'refresh_token'); assert.equal(seen.token[1].form.refresh_token, 'REFRESH1');
     assert.equal(seen.api.at(-1).auth, 'Bearer ACCESS2');
-    // state falsifié
+    // forged state
     globalThis.__FORGET_OAUTH_WINDOW = async ({ redirectUri }) => ({ url: `${redirectUri}?state=forged&code=GOOD` });
     assert.equal((await call(app, 'POST', '/twitter/oauth', { clientId: 'myclient', redirectUri: 'http://127.0.0.1:53682/cb' })).status, 400);
   } finally { delete globalThis.__FORGET_OAUTH_WINDOW; delete globalThis.__FORGET_CIPHER; }
 });
 
-await check('OAuth Reddit : application installée (Basic client_id:), durée permanente, refus et hors-ligne', async () => {
+await check('OAuth Reddit: installed app (Basic client_id:), permanent duration, refusal and offline', async () => {
   const db = newDb();
   const { fetchImpl, seen } = oauthMock();
   let auth = null;
   globalThis.__FORGET_OAUTH_WINDOW = async ({ authorizeUrl, redirectUri }) => { auth = new URL(authorizeUrl); return { url: `${redirectUri}?state=${auth.searchParams.get('state')}&code=${globalThis.__code}` }; };
   try {
     const app = socialRouter(db, { fetchImpl, sleep: async () => {} });
-    assert.equal((await call(app, 'POST', '/reddit/oauth', { clientId: 'redditapp', redirectUri: 'http://127.0.0.1:53682/cb' })).status, 409); // hors-ligne
+    assert.equal((await call(app, 'POST', '/reddit/oauth', { clientId: 'redditapp', redirectUri: 'http://127.0.0.1:53682/cb' })).status, 409); // offline
     online(db);
     globalThis.__code = 'bad';
     assert.equal((await call(app, 'POST', '/reddit/oauth', { clientId: 'redditapp', redirectUri: 'http://127.0.0.1:53682/cb' })).status, 401);
@@ -203,7 +203,7 @@ await check('OAuth Reddit : application installée (Basic client_id:), durée pe
     const ex = seen.token.at(-1);
     assert.equal(ex.host, 'www.reddit.com'); assert.equal(ex.auth, 'Basic ' + Buffer.from('redditapp:').toString('base64'));
     assert.equal(ex.form.code_verifier, undefined);
-    assert.equal((await call(app, 'GET', '/reddit/status')).data.persistence, 'session'); // pas de chiffrement : mémoire seule
+    assert.equal((await call(app, 'GET', '/reddit/status')).data.persistence, 'session'); // no encryption: memory only
   } finally { delete globalThis.__FORGET_OAUTH_WINDOW; delete globalThis.__code; }
 });
 
@@ -230,7 +230,7 @@ function fakeTikTok({ pages = 2, refuseRemovals = 0 } = {}) {
   };
 }
 
-await check('TikTok : inventaire paginé, filtres, archive avant retrait, cadence', async () => {
+await check('TikTok: paginated inventory, filters, archive before removal, pacing', async () => {
   const db = newDb(); online(db);
   let t = 0; const sleeps = [];
   const tk = fakeTikTok();
@@ -242,41 +242,41 @@ await check('TikTok : inventaire paginé, filtres, archive avant retrait, cadenc
   assert.equal((await call(app, 'GET', '/status')).data.count, 6);
   assert.equal((await call(app, 'GET', '/reposts?q=%23fun')).data.total, 3);
   assert.equal((await call(app, 'GET', '/reposts?author=@chef')).data.total, 3);
-  assert.equal((await call(app, 'POST', '/jobs', { ids: [tk.items[0].id] })).status, 400); // confirmation requise
-  assert.equal((await call(app, 'POST', '/jobs', { ids: ['999'], confirm: true })).status, 400); // inconnu
+  assert.equal((await call(app, 'POST', '/jobs', { ids: [tk.items[0].id] })).status, 400); // confirmation required
+  assert.equal((await call(app, 'POST', '/jobs', { ids: ['999'], confirm: true })).status, 400); // unknown
   const ids = [tk.items[0].id, tk.items[1].id];
   sleeps.length = 0;
   const job = await call(app, 'POST', '/jobs', { ids, confirm: true, intervalSec: 5 });
   const j = await done(job.data.jobId);
   assert.equal(j.status, 'done'); assert.equal(j.done, 2);
-  assert.equal(sleeps.filter((ms) => ms === 250).length >= 20, true); // ~5 s entre les deux retraits (pas de 250 ms)
+  assert.equal(sleeps.filter((ms) => ms === 250).length >= 20, true); // about 5 seconds between removals (250 ms steps)
   const arch = db.prepare("SELECT * FROM discordArchive WHERE platform='tiktok' ORDER BY rowid").all();
   assert.equal(arch.length, 2); assert.equal(arch[0].action, 'unrepost'); assert.match(JSON.parse(arch[0].meta).url, /\/video\/7000000000000000000$/);
   assert.equal((await call(app, 'GET', '/status')).data.count, 4);
 });
 
-await check('TikTok : refus -> refroidissement puis reprise ; 3 refus -> arrêt ; hors-ligne refusé', async () => {
+await check('TikTok: refusal -> cooldown then resume; 3 refusals -> stop; offline refused', async () => {
   const db = newDb();
   let t = 0;
   const tk = fakeTikTok({ refuseRemovals: 1 });
   const app = tiktokRouter(db, { bridge: () => tk.bridge, now: () => t, sleep: async (ms) => { t += ms; await new Promise((r) => setImmediate(r)); } });
-  assert.equal((await call(app, 'POST', '/scan')).status, 409); // hors-ligne
+  assert.equal((await call(app, 'POST', '/scan')).status, 409); // offline
   online(db);
   const done = (id) => until(async () => { const j = (await call(app, 'GET', '/jobs')).data.find((x) => x.id === id); return !['running', 'paused', 'cooldown'].includes(j.status) && j; });
   await done((await call(app, 'POST', '/scan')).data.jobId);
   const j1 = await done((await call(app, 'POST', '/jobs', { ids: [tk.items[2].id], confirm: true })).data.jobId);
   assert.equal(j1.status, 'done'); assert.equal(j1.done, 1);
-  assert(t >= 15 * 60_000); // une pause de refroidissement
-  assert.equal(db.prepare("SELECT COUNT(*) n FROM discordArchive WHERE platform='tiktok'").get().n, 1); // pas de double archive
+  assert(t >= 15 * 60_000); // one cooldown pause
+  assert.equal(db.prepare("SELECT COUNT(*) n FROM discordArchive WHERE platform='tiktok'").get().n, 1); // no duplicate archive
   const tk2 = fakeTikTok({ refuseRemovals: 99 });
   const app2 = tiktokRouter(db, { bridge: () => tk2.bridge, now: () => t, sleep: async (ms) => { t += ms; await new Promise((r) => setImmediate(r)); } });
   await done((await call(app2, 'POST', '/scan')).data.jobId);
   const j2 = await done((await call(app2, 'POST', '/jobs', { all: true, confirm: true })).data.jobId);
-  assert.equal(j2.status, 'failed'); assert.match(j2.error, /réessayez dans une heure/);
+  assert.equal(j2.status, 'failed'); assert.match(j2.error, /try again in an hour/);
   assert.equal(tk2.log.filter((x) => x[0] === 'remove').length, 3);
 });
 
-await check('TikTok : pause puis annulation sans retrait supplémentaire', async () => {
+await check('TikTok: pause then cancel with no extra removal', async () => {
   const db = newDb(); online(db);
   let t = 0;
   const tk = fakeTikTok({ pages: 3 });
@@ -286,19 +286,19 @@ await check('TikTok : pause puis annulation sans retrait supplémentaire', async
   const id = (await call(app, 'POST', '/jobs', { all: true, confirm: true, intervalSec: 60 })).data.jobId;
   await until(() => tk.log.some((x) => x[0] === 'remove'));
   assert.equal((await call(app, 'POST', `/jobs/${id}/pause`)).status, 200);
-  assert.equal((await call(app, 'POST', '/jobs', { all: true, confirm: true })).status, 409); // une seule opération
+  assert.equal((await call(app, 'POST', '/jobs', { all: true, confirm: true })).status, 409); // one operation only
   assert.equal((await call(app, 'POST', `/jobs/${id}/cancel`)).status, 200);
   const j = await done(id);
   assert.equal(j.status, 'cancelled');
   assert.equal(tk.log.filter((x) => x[0] === 'remove').length, 1);
 });
 
-// ---------- Discord : protections ----------
-await check('protections : épinglés, pièces jointes, mots exclus, normalisation', () => {
-  const p = protectionParams({ keepPinned: true, excludeWords: ' Adresse ,  , anniv,Adresse', onlyAttachments: 'oui' });
-  assert.deepEqual(p, { keepPinned: true, onlyAttachments: false, excludeWords: ['Adresse', 'anniv'] });
+// ---------- Discord: protections ----------
+await check('protections: pinned, attachments, excluded words, normalization', () => {
+  const p = protectionParams({ keepPinned: true, excludeWords: ' Address ,  , bday,Address', onlyAttachments: 'yes' });
+  assert.deepEqual(p, { keepPinned: true, onlyAttachments: false, excludeWords: ['Address', 'bday'] });
   const keep = protectionFilter(p);
-  assert.equal(keep({ content: 'mon adresse est', attachments: [] }), false);
+  assert.equal(keep({ content: 'my address is', attachments: [] }), false);
   assert.equal(keep({ content: 'bonjour', pinned: true, attachments: [] }), false);
   assert.equal(keep({ content: 'bonjour', attachments: [] }), true);
   assert.equal(protectionFilter({}), null);
@@ -308,8 +308,8 @@ await check('protections : épinglés, pièces jointes, mots exclus, normalisati
 });
 
 
-// ---------- Corrections issues de la revue Codex ----------
-await check('update : requêtes /install concurrentes -> une seule installation, état préservé', async () => {
+// ---------- Fixes from Codex review ----------
+await check('update: concurrent /install requests -> a single install, state preserved', async () => {
   const db = newDb(), dir = mkdtempSync(join(tmpdir(), 'forget-upd-'));
   const { fetchImpl } = githubMock();
   let installs = 0;
@@ -328,22 +328,22 @@ await check('update : requêtes /install concurrentes -> une seule installation,
   } finally { delete globalThis.__FORGET_INSTALL_UPDATE; rmSync(dir, { recursive: true, force: true }); }
 });
 
-await check('update : erreur d’écriture -> état error, pas de crash', async () => {
+await check('update: write error -> error state, no crash', async () => {
   const { mkdirSync } = await import('node:fs');
   const db = newDb(), dir = mkdtempSync(join(tmpdir(), 'forget-upd-'));
-  mkdirSync(join(dir, 'Forget-4.4.0.exe')); // un dossier à la place du fichier : erreur à l'ouverture du flux
-  globalThis.__FORGET_INSTALL_UPDATE = async () => { throw new Error('ne doit pas être appelé'); };
+  mkdirSync(join(dir, 'Forget-4.4.0.exe')); // directory in place of the file: error when opening the stream
+  globalThis.__FORGET_INSTALL_UPDATE = async () => { throw new Error('must not be called'); };
   try {
     const app = updateRouter(db, { fetchImpl: githubMock().fetchImpl, downloadDir: dir, currentVersion: '4.3.0' });
     await call(app, 'PUT', '/repo', { repo: 'me/forget' });
     await call(app, 'POST', '/check'); await call(app, 'POST', '/install');
     const st = await until(async () => { const s = (await call(app, 'GET', '/')).data.state; return s.phase === 'error' && s; });
-    assert.match(st.error, /nouvel exécutable impossible/i);
-    assert.equal((await call(app, 'POST', '/check')).status, 200); // verrou levé après l'échec
+    assert.match(st.error, /could not write the new executable/i);
+    assert.equal((await call(app, 'POST', '/check')).status, 200); // lock released after failure
   } finally { delete globalThis.__FORGET_INSTALL_UPDATE; rmSync(dir, { recursive: true, force: true }); }
 });
 
-await check('OAuth : renouvellements simultanés groupés ; déconnexion pendant un renouvellement respectée', async () => {
+await check('OAuth: simultaneous renewals grouped; disconnect during a renewal respected', async () => {
   const db = newDb(); online(db);
   let t = Date.now();
   const { fetchImpl: base, seen } = oauthMock();
@@ -361,7 +361,7 @@ await check('OAuth : renouvellements simultanés groupés ; déconnexion pendant
     const r = await Promise.all([call(app, 'GET', '/twitter/posts'), call(app, 'GET', '/twitter/posts'), call(app, 'GET', '/twitter/posts')]);
     assert.deepEqual(r.map((x) => x.status), [200, 200, 200]);
     assert.equal(seen.token.filter((x) => x.form.grant_type === 'refresh_token').length, 1);
-    // Déconnexion pendant un renouvellement bloqué.
+    // Disconnect during a blocked refresh.
     t += 7200 * 1000;
     let open; gate = new Promise((ok) => { open = ok; });
     const pending = call(app, 'GET', '/twitter/posts');
@@ -374,7 +374,7 @@ await check('OAuth : renouvellements simultanés groupés ; déconnexion pendant
   } finally { delete globalThis.__FORGET_OAUTH_WINDOW; delete globalThis.__FORGET_CIPHER; }
 });
 
-await check('TikTok : changement de compte pendant un retrait -> arrêt, aucun retrait sur l’autre compte', async () => {
+await check('TikTok: account switch during removal -> stop, nothing removed on the other account', async () => {
   const db = newDb(); online(db);
   let t = 0;
   const tk = fakeTikTok();
@@ -384,11 +384,11 @@ await check('TikTok : changement de compte pendant un retrait -> arrêt, aucun r
   const realRemove = tk.bridge.removeRepost;
   tk.bridge.removeRepost = async (id) => { const r = await realRemove(id); tk.bridge.context = async () => ({ loggedIn: true, secUid: 'MS4wLjABAAAAautrecompte' }); return r; };
   const j = await done((await call(app, 'POST', '/jobs', { all: true, confirm: true })).data.jobId);
-  assert.equal(j.status, 'failed'); assert.match(j.error, /changé de compte/);
+  assert.equal(j.status, 'failed'); assert.match(j.error, /switched accounts/);
   assert.equal(tk.log.filter((x) => x[0] === 'remove').length, 1);
 });
 
-await check('TikTok : même vidéo republiée par deux comptes ; pause pendant un refroidissement', async () => {
+await check('TikTok: same video reposted by two accounts; pause during cooldown', async () => {
   const db = newDb(); online(db);
   let t = 0;
   const tk = fakeTikTok({ pages: 1, refuseRemovals: 1 });
@@ -398,11 +398,11 @@ await check('TikTok : même vidéo republiée par deux comptes ; pause pendant u
   const ctxA = tk.bridge.context;
   tk.bridge.context = async () => ({ loggedIn: true, secUid: 'MS4wLjABAAAAcompteB', uniqueId: 'b' });
   await done((await call(app, 'POST', '/scan')).data.jobId);
-  assert.equal(db.prepare('SELECT COUNT(*) n FROM tiktokRepost').get().n, 6); // 3 vidéos x 2 comptes
+  assert.equal(db.prepare('SELECT COUNT(*) n FROM tiktokRepost').get().n, 6); // 3 videos x 2 accounts
   tk.bridge.context = ctxA;
   await call(app, 'POST', '/session');
   assert.equal((await call(app, 'GET', '/status')).data.count, 3);
-  // Refroidissement (1er refus) puis pause : le statut affiché devient « paused » et le reste après le refroidissement.
+  // Cooldown (first refusal) then pause: displayed status becomes "paused" and stays paused after cooldown.
   let slow = true;
   const app2 = tiktokRouter(db, { bridge: () => tk.bridge, now: () => t, sleep: async (ms) => { t += slow ? Math.min(ms, 1000) : ms; await new Promise((r) => setImmediate(r)); } });
   await call(app2, 'POST', '/session');
@@ -418,7 +418,7 @@ await check('TikTok : même vidéo republiée par deux comptes ; pause pendant u
   assert.equal(j.done, 1);
 });
 
-await check('Discord : annulation pendant l’attente d’un 429 -> aucun nouvel envoi du bulk-delete', async () => {
+await check('Discord: cancel while waiting on a 429 -> bulk-delete not resent', async () => {
   const { initDiscord, discordRouter, setTransport, waitForJob } = await import('../src/discord/index.mjs');
   const { msToSnowflake } = await import('../src/discord/util.mjs');
   const { Hono } = await import('hono');

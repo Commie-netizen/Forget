@@ -15,7 +15,7 @@ const cleanId = v => (typeof v === 'number' && !Number.isSafeInteger(v)) || !ID.
 export const parseJson = text => JSON.parse(text, (key, value, context) => {
   if (/^(id|mid|cid|channel_id|guild_id)$/i.test(key) && typeof value === 'number') {
     if (context?.source && /^\d+$/.test(context.source)) return context.source;
-    if (!Number.isSafeInteger(value)) throw new Error('Identifiant JSON hors précision');
+    if (!Number.isSafeInteger(value)) throw new Error('JSON identifier out of precision');
   }
   return value;
 });
@@ -47,7 +47,7 @@ export function parseCsv(text) {
       if (c === '\n') { rows.push(row); row = []; }
     } else value += c;
   }
-  if (quoted) throw new Error('CSV : guillemet non fermé');
+  if (quoted) throw new Error('CSV: unclosed quote');
   if (value || row.length) { row.push(value.replace(/\r$/, '')); rows.push(row); }
   const headers = (rows.shift() || []).map(s => s.replace(/^\uFEFF/, '').trim().toLowerCase());
   return rows.filter(r => r.some(Boolean)).map(r => Object.fromEntries(headers.map((h, i) => [h, r[i] ?? ''])));
@@ -108,22 +108,22 @@ export async function importSource(db, batchId, source) {
           const file = join(dir, e.name);
           if (e.isDirectory()) await walk(file, depth + 1);
           else if (e.isFile() && /(?:channel|messages)\.(?:json|csv)$/i.test(e.name)) {
-            if ((await stat(file)).size > 64 * 1024 * 1024) throw new Error('Fichier de conversation supérieur à 64 Mo : utilisez la base Forget Engine.');
+            if ((await stat(file)).size > 64 * 1024 * 1024) throw new Error('Conversation file larger than 64 MB: use the Forget Engine database.');
             await consume(file, await readFile(file));
           }
         }
       }
       await walk(source);
     } else if (extname(source).toLowerCase() === '.zip') {
-      // Seuls les fichiers de messages sont décompressés, un à la fois, à mémoire bornée (zipread.mjs).
+      // Only message files are decompressed, one at a time, with bounded memory (zipread.mjs).
       const wanted = (name) => /(?:^|\/)messages\/c?\d+\/(?:channel\.json|messages\.(?:json|csv))$/i.test(name.replaceAll('\\', '/'));
-      for await (const entry of zipEntries(source, wanted, { tooBig: 'Export trop volumineux : utilisez la base Forget Engine.' })) {
+      for await (const entry of zipEntries(source, wanted, { tooBig: 'Export too large: use the Forget Engine database.' })) {
         await consume(entry.name, entry.data);
       }
-    } else throw new Error('Choisissez un export ZIP, un dossier ou une base Forget Engine.');
+    } else throw new Error('Choose a ZIP export, a folder or a Forget Engine database.');
     progress();
     const count = db.prepare('SELECT count(*) n FROM forgetImportMessage WHERE batchId=?').get(batchId).n;
-    if (!count) throw new Error('Aucun message valide trouvé dans cette source.');
+    if (!count) throw new Error('No valid message found in this source.');
     db.prepare("UPDATE forgetImport SET status='ready' WHERE id=?").run(batchId);
   } catch (e) {
     progress(); db.prepare("UPDATE forgetImport SET status='failed',error=? WHERE id=?").run(e.message, batchId);
@@ -180,8 +180,8 @@ export function importRouter(db) {
   });
   app.post('/source', async c => {
     const { path } = await c.req.json();
-    if (typeof path !== 'string' || !path.trim()) return c.json({ error: 'Chemin requis' }, 400);
-    if (batchStatus(db).status === 'importing') return c.json({ error: 'Un import est déjà en cours' }, 409);
+    if (typeof path !== 'string' || !path.trim()) return c.json({ error: 'Path is required' }, 400);
+    if (batchStatus(db).status === 'importing') return c.json({ error: 'An import is already in progress' }, 409);
     const id = randomUUID();
     db.prepare("INSERT INTO forgetImport(id,source,status,createdAt) VALUES (?,?,'importing',?)").run(id, path, Date.now());
     void importSource(db, id, path);
@@ -193,35 +193,35 @@ export function importRouter(db) {
   });
   app.post('/plan', async c => {
     const b = await c.req.json(), batch = batchStatus(db);
-    if (batch.status !== 'ready' || (b.importId && b.importId !== batch.id)) return c.json({ error: 'Import terminé requis' }, 409);
-    if (!Array.isArray(b.channelIds) || !b.channelIds.length || b.channelIds.length > 10000 || b.channelIds.some(id => !cleanId(id))) return c.json({ error: 'Sélectionnez au moins une conversation valide' }, 400);
+    if (batch.status !== 'ready' || (b.importId && b.importId !== batch.id)) return c.json({ error: 'A finished import is required' }, 409);
+    if (!Array.isArray(b.channelIds) || !b.channelIds.length || b.channelIds.length > 10000 || b.channelIds.some(id => !cleanId(id))) return c.json({ error: 'Select at least one valid conversation' }, 400);
     const since = b.since ? timestamp(b.since) : 0, until = b.until ? timestamp(b.until) : 8640000000000000;
-    if (since === null || until === null || since > until) return c.json({ error: 'Plage de dates invalide' }, 400);
+    if (since === null || until === null || since > until) return c.json({ error: 'Invalid date range' }, 400);
     const id = randomUUID();
     db.exec('BEGIN');
     try {
       const insert = db.prepare('INSERT OR IGNORE INTO forgetImportPlanItem SELECT ?,mid,cid,ts,content FROM forgetImportMessage WHERE batchId=? AND cid=? AND ts>=? AND ts<=?');
       for (const cid of new Set(b.channelIds)) insert.run(id, batch.id, cid, since, until);
       const count = db.prepare('SELECT count(*) n FROM forgetImportPlanItem WHERE planId=?').get(id).n;
-      if (!count) throw new Error('Aucun message pour cette sélection');
+      if (!count) throw new Error('No message for this selection');
       db.prepare("INSERT INTO forgetImportPlan(id,batchId,status,count,createdAt) VALUES (?,?,'ready',?,?)").run(id, batch.id, count, Date.now());
       db.exec('COMMIT'); return c.json({ planId: id, count });
     } catch (e) { db.exec('ROLLBACK'); throw e; }
   });
   app.get('/plan/:id', c => {
     const plan = planOut(db, c.req.param('id'));
-    if (!plan) return c.json({ error: 'Plan introuvable' }, 404);
+    if (!plan) return c.json({ error: 'Plan not found' }, 404);
     const jobs = plan.jobIds.map(store.getJob).filter(Boolean);
     const stats = jobs.reduce((a, j) => ({ deleted: a.deleted + j.deleted, failed: a.failed + j.failed, skipped: a.skipped + (j.skipped || 0) }), { deleted: 0, failed: 0, skipped: 0 });
     return c.json({ plan, stats, jobs, items: db.prepare('SELECT * FROM forgetImportPlanItem WHERE planId=? ORDER BY ts LIMIT 50').all(plan.id) });
   });
   app.post('/plan/:id/execute', async c => {
     const b = await c.req.json(), plan = planOut(db, c.req.param('id'));
-    if (!plan) return c.json({ error: 'Plan introuvable' }, 404);
-    if (plan.status !== 'ready') return c.json({ error: 'Ce plan a déjà été lancé. Construisez un nouveau plan pour reprendre.' }, 409);
+    if (!plan) return c.json({ error: 'Plan not found' }, 404);
+    if (plan.status !== 'ready') return c.json({ error: 'This plan has already been started. Build a new plan to resume.' }, 409);
     if (b.confirm !== true) return c.json({ error: 'Confirmation requise' }, 400);
-    if (!store.getToken()) return c.json({ error: 'Discord non connecté' }, 409);
-    if (active.size) return c.json({ error: 'Un plan est déjà en cours' }, 409);
+    if (!store.getToken()) return c.json({ error: 'Discord is not connected' }, 409);
+    if (active.size) return c.json({ error: 'A plan is already running' }, 409);
     const concurrency = Math.min(8, Math.max(1, Math.floor(Number(b.concurrency) || 4)));
     db.prepare("UPDATE forgetImportPlan SET status='running' WHERE id=?").run(plan.id);
     void runPlan(db, plan, concurrency);

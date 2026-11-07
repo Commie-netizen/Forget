@@ -1,22 +1,22 @@
-name: Rapport de bug
-description: Signaler un comportement incorrect
+name: Bug report
+description: Report incorrect behavior
 labels: [bug]
 body:
   - type: markdown
     attributes:
       value: |
-        Ne collez jamais de token, de contenu de message ni de base de données. Pour une faille de sécurité, utilisez les avis de sécurité privés.
+        Never paste tokens, message content, or databases. For security vulnerabilities, use private security advisories.
   - type: input
     id: version
     attributes:
-      label: Version de Forget
+      label: Forget version
       placeholder: "4.0.0"
     validations:
       required: true
   - type: input
     id: os
     attributes:
-      label: Version de Windows
+      label: Windows version
       placeholder: "Windows 11 23H2"
   - type: textarea
     id: description
@@ -27,15 +27,15 @@ body:
   - type: textarea
     id: steps
     attributes:
-      label: Étapes pour reproduire
+      label: Steps to reproduce
     validations:
       required: true
   - type: textarea
     id: expected
     attributes:
-      label: Comportement attendu
+      label: Expected behavior
   - type: textarea
     id: logs
     attributes:
-      label: Logs (caviardés)
+      label: Logs (redacted)
       render: text

@@ -30,7 +30,7 @@ export function PageHeader({ title, subtitle, actions }) {
   );
 }
 
-// Bandeau d'information / d'erreur. tone : info | warn | error | ok
+// Information / error banner. tone: info | warn | error | ok
 export function Notice({ tone = 'info', title, children, action }) {
   if (!children && !title) return null;
   return (
@@ -65,7 +65,7 @@ export function Field({ label, hint, children }) {
   );
 }
 
-export function Spinner({ label = 'Chargement...' }) {
+export function Spinner({ label = "Loading..." }) {
   return (
     <div className="spinner-wrap" role="status">
       <span className="spinner" aria-hidden="true" />

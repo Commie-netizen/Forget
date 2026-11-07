@@ -1,32 +1,32 @@
-# Contribuer à Forget
+# Contributing to Forget
 
-Merci de votre intérêt. Merci de lire le [Code de conduite](CODE_OF_CONDUCT.md).
+Thank you for your interest. Please read the [Code of Conduct](CODE_OF_CONDUCT.md).
 
-## Prérequis
+## Prerequisites
 
 - Windows 10/11, Node.js 22, npm.
 
-## Mise en place
+## Setup
 
 ```bash
 git clone <url-du-depot>
 cd <dossier>
 npm run install:all     # server, web, desktop
-npm run build           # compile l'interface web
-npm run serve           # serveur local
+npm run build           # compile the web interface
+npm run serve           # local server
 ```
 
 ## Conventions
 
-- ESM (`.mjs`), indentation 2 espaces, LF (voir `.editorconfig`).
-- Changements ciblés : une PR, un sujet. Pas de refactor non lié.
-- Aucune sortie réseau ajoutée en dehors du verrou hors-ligne (`npm run test:privacy` doit rester vert).
-- Pas de télémétrie, pas d'appel vers des services tiers.
-- Ne jamais committer de token, de base SQLite, de log ni de contenu personnel (voir `PUBLISHING.md`).
+- ESM (`.mjs`), 2-space indentation, LF (see `.editorconfig`).
+- Focused changes: one PR, one topic. No unrelated refactoring.
+- No outbound network traffic added outside the offline lock (`npm run test:privacy` must keep passing).
+- No telemetry, no calls to third-party services.
+- Never commit tokens, SQLite databases, logs, or personal content (see `PUBLISHING.md`).
 
-## Tests obligatoires
+## Required tests
 
-Avant toute PR, ces commandes doivent passer :
+Before any PR, these commands must pass:
 
 ```bash
 npm test
@@ -35,15 +35,15 @@ npm run test:privacy
 npm run build
 ```
 
-Toute nouvelle fonctionnalité ou correction ajoute ou adapte un test. `npm run verify` est recommandé pour les changements de bout en bout.
+Every new feature or fix must add or update a test. `npm run verify` is recommended for end-to-end changes.
 
 ## Pull requests
 
-1. Forkez et créez une branche (`feat/...`, `fix/...`).
-2. Messages de commit clairs (Conventional Commits appréciés).
-3. Remplissez le modèle de PR et cochez la checklist.
-4. La CI (build Windows) doit être verte.
+1. Fork the repository and create a branch (`feat/...`, `fix/...`).
+2. Write clear commit messages (Conventional Commits welcome).
+3. Fill in the PR template and complete the checklist.
+4. CI (Windows build) must pass.
 
-## Contributing (English)
+## Contributing summary
 
-Node 22, `npm run install:all`, keep the four commands above green, add tests for new behavior, never commit secrets or user data, keep the app offline by default with no telemetry.
+Node 22, `npm run install:all`, keep the four commands above passing, add tests for new behavior, never commit secrets or user data, keep the app offline by default with no telemetry.

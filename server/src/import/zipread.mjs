@@ -1,6 +1,6 @@
-// Lecture ZIP à mémoire bornée : on parcourt le répertoire central, puis on lit UNIQUEMENT les entrées retenues,
-// une à la fois, avec des plafonds de taille décompressée (protection contre les bombes ZIP). Rien n'est écrit
-// sur disque, aucun chemin de l'archive n'est utilisé comme chemin de fichier. ZIP64 pris en charge.
+// Read ZIP files with bounded memory: scan the central directory, then read ONLY selected entries,
+// one at a time, with decompressed size limits (ZIP bomb protection). Nothing is written
+// to disk; archive paths are never used as filesystem paths. ZIP64 is supported.
 import { open } from 'node:fs/promises';
 import { Inflate } from 'fflate';
 
@@ -11,7 +11,7 @@ const fail = (m) => { throw new Error(m); };
 async function readAt(fh, length, position) {
   const buf = Buffer.alloc(length);
   const { bytesRead } = await fh.read(buf, 0, length, position);
-  if (bytesRead !== length) fail('Archive ZIP tronquée');
+  if (bytesRead !== length) fail('Truncated ZIP archive');
   return buf;
 }
 
@@ -20,36 +20,33 @@ async function centralDirectory(fh, size) {
   const tail = await readAt(fh, tailLen, size - tailLen);
   let e = -1;
   for (let i = tailLen - 22; i >= 0; i--) if (tail.readUInt32LE(i) === SIG_EOCD) { e = i; break; }
-  if (e < 0) fail('Archive ZIP invalide');
+  if (e < 0) fail('Invalid ZIP archive');
   let count = tail.readUInt16LE(e + 10), cdSize = tail.readUInt32LE(e + 12), cdOff = tail.readUInt32LE(e + 16);
   if (count === 0xffff || cdSize === 0xffffffff || cdOff === 0xffffffff) {
     const loc = e - 20;
-    if (loc < 0 || tail.readUInt32LE(loc) !== SIG_Z64_LOC) fail('Archive ZIP64 invalide');
+    if (loc < 0 || tail.readUInt32LE(loc) !== SIG_Z64_LOC) fail('Invalid ZIP64 archive');
     const z = await readAt(fh, 56, Number(tail.readBigUInt64LE(loc + 8)));
-    if (z.readUInt32LE(0) !== SIG_Z64_EOCD) fail('Archive ZIP64 invalide');
+    if (z.readUInt32LE(0) !== SIG_Z64_EOCD) fail('Invalid ZIP64 archive');
     count = Number(z.readBigUInt64LE(32)); cdSize = Number(z.readBigUInt64LE(40)); cdOff = Number(z.readBigUInt64LE(48));
   }
-  if (cdSize > MAX_CENTRAL_DIR || cdOff + cdSize > size) fail('Répertoire ZIP invalide ou trop volumineux');
+  if (cdSize > MAX_CENTRAL_DIR || cdOff + cdSize > size) fail('Invalid or oversized ZIP central directory');
   return { count, cd: await readAt(fh, cdSize, cdOff) };
 }
 
-/**
- * Itère sur les entrées dont le nom est accepté : { name, data(Buffer) }.
- * maxEntry : taille décompressée max par entrée ; maxTotal : total décompressé max pour l'archive.
- */
-export async function* zipEntries(path, accept, { maxEntry = 64 * 1024 ** 2, maxTotal = 2 * 1024 ** 3, tooBig = 'Export trop volumineux' } = {}) {
+/** Iterate over entries with accepted names: { name, data(Buffer) }. maxEntry: maximum decompressed size per entry; maxTotal: maximum decompressed size for the archive. */
+export async function* zipEntries(path, accept, { maxEntry = 64 * 1024 ** 2, maxTotal = 2 * 1024 ** 3, tooBig = 'Export too large' } = {}) {
   const fh = await open(path, 'r');
   try {
     const { size } = await fh.stat();
     const { count, cd } = await centralDirectory(fh, size);
     let p = 0, total = 0;
     for (let n = 0; n < count; n++) {
-      if (p + 46 > cd.length || cd.readUInt32LE(p) !== SIG_CDH) fail('Répertoire ZIP invalide');
+      if (p + 46 > cd.length || cd.readUInt32LE(p) !== SIG_CDH) fail('Invalid ZIP central directory');
       const flags = cd.readUInt16LE(p + 8), method = cd.readUInt16LE(p + 10);
       let csize = cd.readUInt32LE(p + 20), usize = cd.readUInt32LE(p + 24), loff = cd.readUInt32LE(p + 42);
       const nlen = cd.readUInt16LE(p + 28), xlen = cd.readUInt16LE(p + 30), clen = cd.readUInt16LE(p + 32);
       const name = cd.toString(flags & 0x800 ? 'utf8' : 'latin1', p + 46, p + 46 + nlen);
-      for (let x = p + 46 + nlen, end = x + xlen; x + 4 <= end;) { // champ ZIP64 (0x0001)
+      for (let x = p + 46 + nlen, end = x + xlen; x + 4 <= end;) { // ZIP64 field (0x0001)
         const id = cd.readUInt16LE(x), sz = cd.readUInt16LE(x + 2);
         if (id === 1) {
           let q = x + 4;
@@ -61,14 +58,14 @@ export async function* zipEntries(path, accept, { maxEntry = 64 * 1024 ** 2, max
       }
       p += 46 + nlen + xlen + clen;
       if (name.endsWith('/') || !accept(name)) continue;
-      if (flags & 1) fail('Archive ZIP chiffrée non prise en charge');
-      if (method !== 0 && method !== 8) fail(`Compression ZIP non prise en charge (${method})`);
-      if (loff + 30 > size || csize > size) fail('Entrée ZIP invalide');
+      if (flags & 1) fail('Encrypted ZIP archives are not supported');
+      if (method !== 0 && method !== 8) fail(`Unsupported ZIP compression (${method})`);
+      if (loff + 30 > size || csize > size) fail('Invalid ZIP entry');
       const lfh = await readAt(fh, 30, loff);
-      if (lfh.readUInt32LE(0) !== SIG_LFH) fail('Entrée ZIP invalide');
+      if (lfh.readUInt32LE(0) !== SIG_LFH) fail('Invalid ZIP entry');
       let pos = loff + 30 + lfh.readUInt16LE(26) + lfh.readUInt16LE(28);
       const stop = pos + csize;
-      if (stop > size) fail('Entrée ZIP tronquée');
+      if (stop > size) fail('Truncated ZIP entry');
       const out = [];
       let got = 0;
       const take = (chunk) => {

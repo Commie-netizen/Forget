@@ -15,25 +15,25 @@ import {
 } from '../lib.js';
 
 const SPEEDS = {
-  adaptive: { label: 'Adaptatif', desc: 'Cadence ajustée aux quotas Discord. Quotas partagés entre toutes les opérations.', delayMs: 0, concurrency: 4 },
-  safe: { label: 'Prudent', desc: 'Au moins 900 ms entre opérations, en respectant les quotas Discord.', delayMs: 900, concurrency: 1 },
-  fast: { label: 'Rapide', desc: 'Au moins 300 ms entre opérations, en respectant les quotas Discord.', delayMs: 300, concurrency: 2 },
-  custom: { label: 'Personnalisé', desc: 'Réglez vous-même le délai et la concurrence.' },
+  adaptive: { label: "Adaptive", desc: "Pace adjusts to Discord rate limits, shared across all operations.", delayMs: 0, concurrency: 4 },
+  safe: { label: "Cautious", desc: "At least 900 ms between operations, respecting Discord rate limits.", delayMs: 900, concurrency: 1 },
+  fast: { label: "Fast", desc: "At least 300 ms between operations, respecting Discord rate limits.", delayMs: 300, concurrency: 2 },
+  custom: { label: "Custom", desc: "Set the delay and concurrency yourself." },
 };
 
 const EDIT_MODES = [
-  { value: 'replace', label: 'Remplacer un texte' },
-  { value: 'set', label: 'Remplacer tout le contenu' },
-  { value: 'append', label: 'Ajouter à la fin' },
-  { value: 'prepend', label: 'Ajouter au début' },
+  { value: 'replace', label: "Replace text" },
+  { value: 'set', label: "Replace all content" },
+  { value: 'append', label: "Append text" },
+  { value: 'prepend', label: "Prepend text" },
 ];
 
 function SpeedPicker({ speed, setSpeed }) {
   const preset = SPEEDS[speed.mode];
   return (
     <fieldset className="fieldset">
-      <legend className="field-label">Vitesse</legend>
-      <div className="segmented" role="radiogroup" aria-label="Vitesse d’exécution">
+      <legend className="field-label">Speed</legend>
+      <div className="segmented" role="radiogroup" aria-label="Execution speed">
         {Object.entries(SPEEDS).map(([id, s]) => (
           <button
             key={id}
@@ -50,8 +50,8 @@ function SpeedPicker({ speed, setSpeed }) {
       <p className="muted small">{preset.desc}</p>
       {speed.mode === 'custom' && (
         <div className="two-col">
-          <Slider label="Délai entre requêtes" unit=" ms" min={150} max={2000} step={50} value={speed.delayMs} onChange={(v) => setSpeed({ ...speed, delayMs: v })} />
-          <Slider label="Concurrence" min={1} max={4} step={1} value={speed.concurrency} onChange={(v) => setSpeed({ ...speed, concurrency: v })} />
+          <Slider label="Delay between requests" unit=" ms" min={150} max={2000} step={50} value={speed.delayMs} onChange={(v) => setSpeed({ ...speed, delayMs: v })} />
+          <Slider label="Concurrency" min={1} max={4} step={1} value={speed.concurrency} onChange={(v) => setSpeed({ ...speed, concurrency: v })} />
         </div>
       )}
     </fieldset>
@@ -87,7 +87,7 @@ export function JobPanel({ id, onCancelled }) {
     }
   }
 
-  if (!j) return job.error ? <Notice tone="error">{job.error}</Notice> : <p className="muted small">Chargement du job...</p>;
+  if (!j) return job.error ? <Notice tone="error">{job.error}</Notice> : <p className="muted small">Loading job...</p>;
   const active = isActive(j.status);
   const done = (j.deleted || 0) + (j.edited || 0) + (j.failed || 0);
   const progress = j.progress ?? done;
@@ -97,33 +97,33 @@ export function JobPanel({ id, onCancelled }) {
   return (
     <div className="job">
       <div className="row">
-        <strong>{j.kind === 'edit' ? 'Édition en masse' : 'Suppression en masse'}</strong>
+        <strong>{j.kind === 'edit' ? "Bulk edit" : "Bulk deletion"}</strong>
         {j.params?.channelId && <span className="muted small">{j.params.channelName || j.params.channelId}</span>}
         <StatusBadge value={j.status} />
         <span className="grow" />
         {active && (
           <button type="button" className="btn sm danger" disabled={busy || j.cancelRequested} onClick={cancel}>
-            {j.cancelRequested ? 'Annulation demandée...' : 'Annuler'}
+            {j.cancelRequested ? "Cancellation requested..." : "Cancel"}
           </button>
         )}
       </div>
       <Progress
-        label="Progression du job"
+        label="Job progress"
         value={progress}
         max={j.total || Math.max(progress, 1)}
         tone={j.status === 'failed' ? 'red' : j.status === 'done' || j.status === 'succeeded' || j.status === 'completed' ? 'green' : 'blue'}
         indeterminate={active && !j.total}
       />
       <div className="counters">
-        <span><strong>{nf(progress)}</strong> / {j.total ? nf(j.total) : '?'} traités</span>
-        <span className="c-green"><strong>{nf(j.deleted)}</strong> supprimés</span>
-        <span className="c-blue"><strong>{nf(j.edited)}</strong> édités</span>
-        <span className="c-red"><strong>{nf(j.failed)}</strong> échecs</span>
-        <span><strong>{rate.toLocaleString('fr-FR', { maximumFractionDigits: 2 })}</strong> msg/s mesurés</span>
+        <span><strong>{nf(progress)}</strong> / {j.total ? nf(j.total) : '?'} processed</span>
+        <span className="c-green"><strong>{nf(j.deleted)}</strong> deleted</span>
+        <span className="c-blue"><strong>{nf(j.edited)}</strong> edited</span>
+        <span className="c-red"><strong>{nf(j.failed)}</strong> failures</span>
+        <span><strong>{rate.toLocaleString("en-US", { maximumFractionDigits: 2 })}</strong> msg/s measured</span>
       </div>
       {(j.error || err) && <Notice tone="error">{j.error || err}</Notice>}
       {logs.length > 0 && (
-        <ul className="logs" aria-label="Journal du job">
+        <ul className="logs" aria-label="Job log">
           {logs.map((l) => (
             <li key={l.id || `${l.at}-${l.message}`} className={l.level === 'error' ? 'c-red' : l.level === 'warn' ? 'c-orange' : ''}>
               <span className="muted">{fmtDate(l.at)}</span> {l.message}
@@ -136,11 +136,11 @@ export function JobPanel({ id, onCancelled }) {
 }
 
 const PURGE_SPEEDS = [
-  { value: 'safe', label: 'Safe (le plus discret)' },
-  { value: 'fast', label: 'Fast (risque de 429 plus élevé)' },
+  { value: 'safe', label: "Safe (most discreet)" },
+  { value: 'fast', label: "Fast (higher risk of 429 errors)" },
 ];
 
-// Purges planifiées : traitement par lots, sans aucun maximum (SPEC-V4 A3 / B2).
+// Scheduled purges: batch processing with no limit (SPEC-V4 A3 / B2).
 function PurgesCard({ channelId, guildId, guildName, channelName, targetLabel }) {
   const purges = useLoad(
     async () => {
@@ -181,7 +181,7 @@ function PurgesCard({ channelId, guildId, guildName, channelName, targetLabel })
       });
       await purges.reload(true);
     } catch (ex) {
-      setErr(api.isMissingEndpoint(ex) ? 'Les purges planifiées ne sont pas disponibles sur ce serveur.' : ex.message);
+      setErr(api.isMissingEndpoint(ex) ? "Scheduled purges are unavailable on this server." : ex.message);
     } finally {
       setBusy('');
     }
@@ -203,34 +203,34 @@ function PurgesCard({ channelId, guildId, guildName, channelName, targetLabel })
 
   return (
     <Card
-      title="5. Purges planifiées"
-      subtitle="Aucun maximum — la purge continue par lots jusqu’à épuisement."
-      actions={<button type="button" className="btn sm" onClick={() => purges.reload(true)}><Icon name="refresh" size={14} /> Actualiser</button>}
+      title="5. Scheduled purges"
+      subtitle="No limit. The purge runs in batches until complete."
+      actions={<button type="button" className="btn sm" onClick={() => purges.reload(true)}><Icon name="refresh" size={14} /> Refresh</button>}
     >
       {purges.error && <Notice tone="error">{purges.error}</Notice>}
-      {unavailable && <Notice tone="warn">Les purges planifiées ne sont pas disponibles sur ce serveur (endpoint absent).</Notice>}
+      {unavailable && <Notice tone="warn">Scheduled purges are unavailable on this server (missing endpoint).</Notice>}
       <form className="stack" onSubmit={create}>
-        <p className="muted small">Cible : {targetLabel || 'choisissez un salon ou une conversation à l’étape 1'}.</p>
+        <p className="muted small">Target: {targetLabel || "choose a channel or conversation in step 1"}.</p>
         <div className="grid-fields">
-          <Field label="Intervalle (minutes)" hint="Délai entre deux exécutions.">
+          <Field label="Interval (minutes)" hint="Delay between runs.">
             <input type="number" min="1" value={intervalMin} onChange={(e) => setIntervalMin(e.target.value)} />
           </Field>
-          <Field label="Taille de lot" hint="Messages traités par exécution (défaut 5000).">
+          <Field label="Batch size" hint="Messages processed per run (default 5000).">
             <input type="number" min="1" value={chunkSize} onChange={(e) => setChunkSize(e.target.value)} />
           </Field>
-          <Select label="Vitesse" value={pSpeed} onChange={setPSpeed} options={PURGE_SPEEDS} />
-          <Field label="Depuis le (optionnel)"><input type="date" value={pFrom} max={pTo || undefined} onChange={(e) => setPFrom(e.target.value)} /></Field>
-          <Field label="Jusqu’au (optionnel)"><input type="date" value={pTo} min={pFrom || undefined} onChange={(e) => setPTo(e.target.value)} /></Field>
+          <Select label="Speed" value={pSpeed} onChange={setPSpeed} options={PURGE_SPEEDS} />
+          <Field label="From (optional)"><input type="date" value={pFrom} max={pTo || undefined} onChange={(e) => setPFrom(e.target.value)} /></Field>
+          <Field label="Until (optional)"><input type="date" value={pTo} min={pFrom || undefined} onChange={(e) => setPTo(e.target.value)} /></Field>
         </div>
         <div className="actions">
           <button type="submit" className="btn primary" disabled={!channelId || busy === 'create' || unavailable}>
-            {busy === 'create' ? 'Création...' : 'Planifier la purge'}
+            {busy === 'create' ? "Creating..." : "Schedule purge"}
           </button>
         </div>
       </form>
       {err && <Notice tone="error">{err}</Notice>}
       {list.length === 0 ? (
-        !unavailable && <EmptyState icon="clock" title="Aucune purge planifiée">Les purges créées apparaîtront ici.</EmptyState>
+        !unavailable && <EmptyState icon="clock" title="No scheduled purges">Your purges will appear here.</EmptyState>
       ) : (
         <ul className="list">
           {list.map((p) => {
@@ -243,20 +243,20 @@ function PurgesCard({ channelId, guildId, guildName, channelName, targetLabel })
                   <span className="grow" />
                   {live && (
                     <>
-                      <button type="button" className="btn sm" disabled={!!busy} onClick={() => act('run', p.id)}>Exécuter maintenant</button>
-                      <button type="button" className="btn sm danger" disabled={!!busy} onClick={() => act('cancel', p.id)}>Annuler</button>
+                      <button type="button" className="btn sm" disabled={!!busy} onClick={() => act('run', p.id)}>Run now</button>
+                      <button type="button" className="btn sm danger" disabled={!!busy} onClick={() => act('cancel', p.id)}>Cancel</button>
                     </>
                   )}
                 </div>
                 <div className="counters">
-                  <span><strong>{nf(p.processed)}</strong> traités</span>
-                  <span className="c-green"><strong>{nf(p.deleted)}</strong> supprimés</span>
-                  <span className="c-red"><strong>{nf(p.failed)}</strong> échecs</span>
-                  <span><strong>{nf(p.runs)}</strong> exécution(s)</span>
+                  <span><strong>{nf(p.processed)}</strong> processed</span>
+                  <span className="c-green"><strong>{nf(p.deleted)}</strong> deleted</span>
+                  <span className="c-red"><strong>{nf(p.failed)}</strong> failures</span>
+                  <span><strong>{nf(p.runs)}</strong> runs</span>
                 </div>
                 <div className="muted small">
-                  Curseur : {p.cursorBefore || '-'} · Lot {nf(p.chunkSize)} · toutes les {nf(Math.round((p.intervalSec || 0) / 60))} min
-                  {live ? ` · prochaine exécution : ${fmtDate(p.nextRunAt)}` : ''}
+                  Cursor: {p.cursorBefore || '-'} · Batch {nf(p.chunkSize)} · every {nf(Math.round((p.intervalSec || 0) / 60))} min
+                  {live ? ` · next run: ${fmtDate(p.nextRunAt)}` : ''}
                 </div>
                 {p.error && <Notice tone="error">{p.error}</Notice>}
               </li>
@@ -275,17 +275,17 @@ function DiscordManager() {
   const dms = useLoad(() => api.discordDms());
   const recent = useLoad(() => api.discordJobs(), { poll: (d) => Array.isArray(d) && d.some((j) => isActive(j.status)) });
 
-  // Cible
+  // Target
   const [source, setSource] = useState('guild');
   const [guildId, setGuildId] = useState('');
   const [channelId, setChannelId] = useState('');
-  // Filtres de recherche
+  // Search filters
   const [content, setContent] = useState('');
   const [authorMode, setAuthorMode] = useState('me');
   const [authorId, setAuthorId] = useState('');
   const [from, setFrom] = useState('');
   const [to, setTo] = useState('');
-  // Résultats
+  // Results
   const [res, setRes] = useState(null);
   const [offset, setOffset] = useState(0);
   const [searching, setSearching] = useState(false);
@@ -303,11 +303,11 @@ function DiscordManager() {
   const [launching, setLaunching] = useState(false);
   const [actionErr, setActionErr] = useState('');
   const [jobIds, setJobIds] = useState([]);
-  // Protections (portées hors sélection) : épinglés, pièces jointes, mots exclus.
+  // Safeguards (outside selection scope): pinned messages, attachments, excluded words.
   const [keepPinned, setKeepPinned] = useState(true);
   const [onlyAttachments, setOnlyAttachments] = useState(false);
   const [excludeWords, setExcludeWords] = useState('');
-  // Aperçu avant suppression et délai de grâce avant lancement.
+  // Preview before deletion and grace period before starting.
   const [preview, setPreview] = useState(null);
   const [pending, setPending] = useState(null); // { kind, at }
   const [nowTick, setNowTick] = useState(Date.now());
@@ -320,7 +320,7 @@ function DiscordManager() {
   const dm = dmList.find((d) => d.id === channelId);
   const dmName = (d) => d.name || d.recipients?.map((r) => r.username).join(', ') || d.id;
 
-  // Filtres (insensibles à la casse et aux accents) ; la sélection courante reste toujours listée.
+  // Case- and accent-insensitive filters; keep the current selection listed.
   const [guildQuery, setGuildQuery] = useState('');
   const [channelQuery, setChannelQuery] = useState('');
   const [dmQuery, setDmQuery] = useState('');
@@ -330,8 +330,8 @@ function DiscordManager() {
 
   const targetLabel =
     source === 'dm'
-      ? dm ? `MP · ${dm.name || dm.recipients?.map((r) => r.username).join(', ')}` : ''
-      : guild ? `${guild.name}${channelId ? ` / #${channels.find((c) => c.id === channelId)?.name || channelId}` : ' / tous les salons'}` : '';
+      ? dm ? `DM · ${dm.name || dm.recipients?.map((r) => r.username).join(', ')}` : ''
+      : guild ? `${guild.name}${channelId ? ` / #${channels.find((c) => c.id === channelId)?.name || channelId}` : " / all channels"}` : '';
 
   const hasTarget = source === 'dm' ? !!channelId : !!guildId;
   const jobChannelOk = !!channelId;
@@ -374,7 +374,7 @@ function DiscordManager() {
     }
   }
 
-  // Maj+clic : sélectionne (ou désélectionne) toute la plage depuis le dernier message cliqué.
+  // Shift+click selects (or deselects) the range from the last clicked message.
   function toggleMsg(m, idx, shift) {
     const from = shift && lastIdx.current >= 0 ? Math.min(lastIdx.current, idx) : idx;
     const until = shift && lastIdx.current >= 0 ? Math.max(lastIdx.current, idx) : idx;
@@ -416,11 +416,11 @@ function DiscordManager() {
       : jobChannelOk && rangeValid;
 
   function scopeDescription() {
-    if (scope === 'selection') return `${nf(checked.size)} message(s) sélectionné(s) dans les résultats de recherche`;
-    const lim = limitValue ? ` (maximum ${nf(limitValue)})` : ' (aucun maximum)';
-    if (scope === 'all') return 'Conversation entière : tous vos messages du salon, sans aucun maximum';
-    if (scope === 'search') return `Tous vos messages correspondant à la recherche${content.trim() ? ` « ${content.trim()} »` : ''}${from ? ` depuis le ${from}` : ''}${to ? ` jusqu’au ${to}` : ''}`;
-    return `Vos messages du salon ${from ? `depuis le ${from}` : ''}${from && to ? ' ' : ''}${to ? `jusqu’au ${to}` : ''}${lim}`;
+    if (scope === 'selection') return `${nf(checked.size)} messages selected in search results`;
+    const lim = limitValue ? ` (maximum ${nf(limitValue)})` : " (no limit)";
+    if (scope === 'all') return "Entire conversation: all your messages in the channel, with no limit";
+    if (scope === 'search') return `All your messages matching the search${content.trim() ? ` "${content.trim()}"` : ''}${from ? ` from ${from}` : ''}${to ? ` until ${to}` : ''}`;
+    return `Your messages in channel ${from ? `from ${from}` : ''}${from && to ? ' ' : ''}${to ? `until ${to}` : ''}${lim}`;
   }
 
   function buildBodies(kind) {
@@ -459,7 +459,7 @@ function DiscordManager() {
     return [{ ...base, ...protect, channelId, ...(source === 'guild' && guildId ? { guildId } : {}), ...range, ...lim }];
   }
 
-  // Aperçu : estimation Discord + exemples, sans aucune action, à l'ouverture de la confirmation.
+  // Preview: Discord estimate and examples, with no action, when confirmation opens.
   useEffect(() => {
     if (!confirm || scope === 'selection') { setPreview(null); return undefined; }
     let alive = true;
@@ -470,7 +470,7 @@ function DiscordManager() {
     return () => { alive = false; };
   }, [confirm]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  // Délai de grâce : le job ne part qu'après GRACE_MS ; « Annuler » l'abandonne sans aucun appel Discord.
+  // Grace period: the job starts only after GRACE_MS; Cancel discards it without any Discord call.
   const GRACE_MS = 5000;
   useEffect(() => {
     if (!pending) return undefined;
@@ -480,8 +480,8 @@ function DiscordManager() {
     }, 200);
     return () => clearInterval(t);
   }, [pending]); // eslint-disable-line react-hooks/exhaustive-deps
-  // Les paramètres (cible, portée, filtres) sont figés à la confirmation : changer de salon pendant le délai
-  // n'a aucun effet sur l'opération confirmée.
+  // Parameters (target, scope, filters) are frozen at confirmation: changing channels during the delay
+  // has no effect on the confirmed operation.
   function schedule() {
     setPending({ kind: confirm, at: Date.now() + GRACE_MS, bodies: buildBodies(confirm), clearSelection: scope === 'selection' });
     setNowTick(Date.now());
@@ -511,13 +511,13 @@ function DiscordManager() {
 
   const recentJobs = Array.isArray(recent.data) ? recent.data : [];
   const sourceOptions = useMemo(() => [
-    { value: 'guild', label: 'Serveur' },
-    { value: 'dm', label: 'Messages privés' },
+    { value: 'guild', label: "Server" },
+    { value: 'dm', label: "Direct messages" },
   ], []);
 
   return (
     <>
-      <Card title="1. Choisir la cible" subtitle="Serveur puis salon, ou conversation privée.">
+      <Card title="1. Choose a target" subtitle="Server and channel, or a direct conversation.">
         {(guilds.error || dms.error) && <Notice tone="error">{guilds.error || dms.error}</Notice>}
         <div className="grid-fields">
           <Select
@@ -528,111 +528,111 @@ function DiscordManager() {
           />
           {source === 'guild' ? (
             <>
-              <Field label="Filtrer les serveurs" hint={`${nf(shownGuilds.length)} / ${nf(guildList.length)} serveur(s)`}>
-                <input type="search" value={guildQuery} onChange={(e) => setGuildQuery(e.target.value)} placeholder="Nom du serveur..." />
+              <Field label="Filter servers" hint={`${nf(shownGuilds.length)} / ${nf(guildList.length)} servers`}>
+                <input type="search" value={guildQuery} onChange={(e) => setGuildQuery(e.target.value)} placeholder="Server name..." />
               </Field>
               <Select
-                label="Serveur"
+                label="Server"
                 value={guildId}
                 disabled={guilds.loading}
-                options={[{ value: '', label: guilds.loading ? 'Chargement...' : 'Choisir un serveur' }, ...shownGuilds.map((g) => ({ value: g.id, label: g.name }))]}
+                options={[{ value: '', label: guilds.loading ? "Loading..." : "Choose a server" }, ...shownGuilds.map((g) => ({ value: g.id, label: g.name }))]}
                 onChange={(v) => { setGuildId(v); setChannelId(''); setChannelQuery(''); resetResults(); }}
               />
-              <Field label="Filtrer les salons" hint={guildId ? `${nf(shownChannels.length)} / ${nf(channels.length)} salon(s)` : 'Choisissez un serveur d’abord'}>
-                <input type="search" value={channelQuery} disabled={!guildId} onChange={(e) => setChannelQuery(e.target.value)} placeholder="Nom du salon..." />
+              <Field label="Filter channels" hint={guildId ? `${nf(shownChannels.length)} / ${nf(channels.length)} channels` : "Choose a server first"}>
+                <input type="search" value={channelQuery} disabled={!guildId} onChange={(e) => setChannelQuery(e.target.value)} placeholder="Channel name..." />
               </Field>
               <Select
-                label="Salon"
+                label="Channel"
                 value={channelId}
                 disabled={!guildId}
-                options={[{ value: '', label: guildId ? 'Tous les salons (recherche seule)' : 'Choisir un serveur d’abord' }, ...shownChannels.map((c) => ({ value: c.id, label: `# ${c.name}` }))]}
+                options={[{ value: '', label: guildId ? "All channels (search only)" : "Choose a server first" }, ...shownChannels.map((c) => ({ value: c.id, label: `# ${c.name}` }))]}
                 onChange={(v) => { setChannelId(v); resetResults(); }}
               />
             </>
           ) : (
             <>
-            <Field label="Rechercher un MP" hint={`${nf(shownDms.length)} / ${nf(dmList.length)} conversation(s)`}>
-              <input type="search" value={dmQuery} onChange={(e) => setDmQuery(e.target.value)} placeholder="Nom ou pseudo..." />
+            <Field label="Search DMs" hint={`${nf(shownDms.length)} / ${nf(dmList.length)} conversations`}>
+              <input type="search" value={dmQuery} onChange={(e) => setDmQuery(e.target.value)} placeholder="Name or username..." />
             </Field>
             <Select
               label="Conversation"
               value={channelId}
               disabled={dms.loading}
-              options={[{ value: '', label: dms.loading ? 'Chargement...' : 'Choisir une conversation' }, ...shownDms.map((d) => ({ value: d.id, label: dmName(d) }))]}
+              options={[{ value: '', label: dms.loading ? "Loading..." : "Choose a conversation" }, ...shownDms.map((d) => ({ value: d.id, label: dmName(d) }))]}
               onChange={(v) => { setChannelId(v); resetResults(); }}
             />
             </>
           )}
         </div>
         {!guilds.loading && source === 'guild' && guildList.length === 0 && !guilds.error && (
-          <p className="muted small">Aucun serveur trouvé sur ce compte.</p>
+          <p className="muted small">No servers found for this account.</p>
         )}
       </Card>
 
-      <Card className="message-search" title="2. Rechercher des messages" subtitle="Filtrez par auteur, date ou contenu.">
+      <Card className="message-search" title="2. Search messages" subtitle="Filter by author, date, or content.">
         <form
           className="stack"
           onSubmit={(e) => { e.preventDefault(); runSearch(0); }}
         >
           <div className="grid-fields">
-            <Field label="Contenu contient">
-              <input value={content} onChange={(e) => setContent(e.target.value)} placeholder="mot, phrase..." />
+            <Field label="Content contains">
+              <input value={content} onChange={(e) => setContent(e.target.value)} placeholder="word, phrase..." />
             </Field>
             <Select
-              label="Auteur"
+              label="Author"
               value={authorMode}
               onChange={setAuthorMode}
               options={[
-                { value: 'me', label: 'Moi uniquement' },
-                { value: 'any', label: 'Tous les auteurs' },
-                { value: 'custom', label: 'ID d’un auteur' },
+                { value: 'me', label: "Only me" },
+                { value: 'any', label: "All authors" },
+                { value: 'custom', label: "Author ID" },
               ]}
             />
             {authorMode === 'custom' && (
-              <Field label="ID de l’auteur">
+              <Field label="Author ID">
                 <input value={authorId} onChange={(e) => setAuthorId(e.target.value)} inputMode="numeric" placeholder="123456789012345678" />
               </Field>
             )}
-            <Field label="Depuis le">
+            <Field label="From">
               <input type="date" value={from} max={to || undefined} onChange={(e) => setFrom(e.target.value)} />
             </Field>
-            <Field label="Jusqu’au">
+            <Field label="Until">
               <input type="date" value={to} min={from || undefined} onChange={(e) => setTo(e.target.value)} />
             </Field>
           </div>
           <div className="actions">
             <button type="submit" className="btn primary" disabled={!hasTarget || searching}>
-              <Icon name="search" size={16} /> {searching ? 'Recherche...' : 'Rechercher'}
+              <Icon name="search" size={16} /> {searching ? "Searching..." : "Search"}
             </button>
-            {res && <button type="button" className="btn" onClick={resetResults}>Effacer</button>}
+            {res && <button type="button" className="btn" onClick={resetResults}>Clear</button>}
           </div>
         </form>
 
         {searchErr && <Notice tone="error">{searchErr}</Notice>}
         {!res && !searching && !searchErr && (
-          <EmptyState icon="search" title="Aucune recherche lancée">
-            Choisissez une cible puis lancez une recherche pour sélectionner des messages précis.
+          <EmptyState icon="search" title="No search started">
+            Choose a target and search to select specific messages.
           </EmptyState>
         )}
         {res && msgs.length === 0 && (
-          <EmptyState icon="chat" title="Aucun message trouvé">Modifiez les filtres puis relancez la recherche.</EmptyState>
+          <EmptyState icon="chat" title="No messages found">Change the filters and search again.</EmptyState>
         )}
         {msgs.length > 0 && (
           <>
             <div className="row table-bar">
               <button type="button" className="btn sm" onClick={togglePage}>
-                {allOnPage ? 'Désélectionner la page' : 'Sélectionner la page'}
+                {allOnPage ? "Deselect page" : "Select page"}
               </button>
-              <button type="button" className="btn sm" onClick={invertPage}>Inverser la page</button>
+              <button type="button" className="btn sm" onClick={invertPage}>Invert page selection</button>
               <button type="button" className="btn sm" disabled={checked.size === 0} onClick={() => setChecked(new Map())}>
-                Tout désélectionner
+                Deselect all
               </button>
               <span className="grow" />
               <span className="muted small" role="status" aria-live="polite">
-                {nf(total)} résultat(s) · <strong>{nf(checked.size)}</strong> sélectionné(s)
+                {nf(total)} results · <strong>{nf(checked.size)}</strong> selected
               </span>
             </div>
-            <p className="muted small">Cliquez sur un message pour l’ajouter ou le retirer de la sélection. Maj+clic sélectionne toute la plage depuis le dernier message cliqué.</p>
+            <p className="muted small">Click a message to select or deselect it. Shift+click selects the range from the last clicked message.</p>
             <ul className="msg-list">
               {msgs.map((m, idx) => (
                 <li key={m.id} className={checked.has(m.id) ? 'sel' : ''} onClick={(e) => toggleMsg(m, idx, e.shiftKey)}>
@@ -643,36 +643,36 @@ function DiscordManager() {
                         <strong>{msgAuthor(m)}</strong>
                         {m.channelName && <span className="muted"> · #{m.channelName}</span>}
                         <span className="muted"> · {fmtDate(msgDate(m))}</span>
-                        {Array.isArray(m.attachments) && m.attachments.length > 0 && <span className="muted"> · {m.attachments.length} pièce(s) jointe(s)</span>}
-                        {m.pinned && <span className="muted"> · épinglé</span>}
+                        {Array.isArray(m.attachments) && m.attachments.length > 0 && <span className="muted"> · {m.attachments.length} attachments</span>}
+                        {m.pinned && <span className="muted"> · pinned</span>}
                       </span>
-                      <span className="msg-text">{msgText(m) || <em className="muted">(sans texte)</em>}</span>
-                      {checked.has(m.id) && <span className="sr-only">Message sélectionné</span>}
+                      <span className="msg-text">{msgText(m) || <em className="muted">(no text)</em>}</span>
+                      {checked.has(m.id) && <span className="sr-only">Selected message</span>}
                     </span>
                   </div>
                 </li>
               ))}
             </ul>
             <div className="row pager">
-              <button type="button" className="btn sm" disabled={offset === 0 || searching} onClick={() => runSearch(Math.max(0, offset - PAGE))}>Précédent</button>
+              <button type="button" className="btn sm" disabled={offset === 0 || searching} onClick={() => runSearch(Math.max(0, offset - PAGE))}>Previous</button>
               <span className="muted small">
-                {nf(offset + 1)} - {nf(offset + msgs.length)} sur {nf(total)}
+                {nf(offset + 1)} - {nf(offset + msgs.length)} of {nf(total)}
               </span>
-              <button type="button" className="btn sm" disabled={offset + PAGE >= total || searching} onClick={() => runSearch(offset + PAGE)}>Suivant</button>
+              <button type="button" className="btn sm" disabled={offset + PAGE >= total || searching} onClick={() => runSearch(offset + PAGE)}>Next</button>
             </div>
           </>
         )}
       </Card>
 
-      <Card title="3. Action groupée" subtitle="Les messages sont copiés dans l’archive locale avant toute modification.">
+      <Card title="3. Bulk action" subtitle="Messages are copied to the local archive before any changes.">
         <fieldset className="fieldset">
-          <legend className="field-label">Messages concernés</legend>
-          <div className="segmented" role="radiogroup" aria-label="Messages concernés">
+          <legend className="field-label">Messages to include</legend>
+          <div className="segmented" role="radiogroup" aria-label="Messages to include">
             {[
-              ['selection', 'Sélection souris'],
-              ['range', 'Plage de dates'],
-              ['search', 'Tous les résultats de la recherche'],
-              ['all', 'Conversation entière (aucun maximum)'],
+              ['selection', "Mouse selection"],
+              ['range', "Date range"],
+              ['search', "All search results"],
+              ['all', "Entire conversation (no limit)"],
             ].map(([v, l]) => (
               <button key={v} type="button" role="radio" aria-checked={scope === v} className={scope === v ? 'on' : ''} onClick={() => setScope(v)}>
                 {l}
@@ -681,27 +681,27 @@ function DiscordManager() {
           </div>
           {scope === 'selection' && (
             <p className="muted small" role="status" aria-live="polite">
-              <strong>{nf(checked.size)}</strong> message(s) sélectionné(s) à la souris dans les résultats de recherche.
-              {checked.size > 0 && <> <button type="button" className="link" onClick={() => setChecked(new Map())}>Tout désélectionner</button></>}
+              <strong>{nf(checked.size)}</strong> messages selected by mouse in search results.
+              {checked.size > 0 && <> <button type="button" className="link" onClick={() => setChecked(new Map())}>Deselect all</button></>}
             </p>
           )}
           {scope === 'range' && (
-            <p className="muted small">Les dates « depuis » et « jusqu’au » du bloc de recherche servent de plage{from || to ? ` (${from || '...'} → ${to || '...'})` : ' : renseignez-en au moins une'}.</p>
+            <p className="muted small">The From and Until dates in the search section define the range{from || to ? ` (${from || '...'} → ${to || '...'})` : ": enter at least one date"}.</p>
           )}
           {scope === 'all' && (
             <p className="muted small">
-              Tous vos messages du salon ou de la conversation choisi(e) sont traités, par lots, sans aucun maximum
-              {res?.total ? ` (environ ${nf(res.total)} correspondance(s) dans la dernière recherche)` : ''}.
+              All your messages in the selected channel or conversation are processed in batches, with no limit
+              {res?.total ? ` (about ${nf(res.total)} matches in the last search)` : ''}.
             </p>
           )}
           {scope === 'search' && (
-            <p className="muted small">Toutes les pages de la recherche (contenu et dates du bloc 2), uniquement vos messages{channelId ? '' : ', dans tout le serveur ou la conversation'}{content.trim() || from || to ? '' : ' : renseignez un contenu ou une date'}.</p>
+            <p className="muted small">All search pages (content and dates from section 2), only your messages{channelId ? '' : ", across the server or conversation"}{content.trim() || from || to ? '' : ": enter content or a date"}.</p>
           )}
-          {scope !== 'selection' && scope !== 'search' && !jobChannelOk && <Notice tone="warn">Choisissez un salon précis (pas « tous les salons ») pour ce mode.</Notice>}
+          {scope !== 'selection' && scope !== 'search' && !jobChannelOk && <Notice tone="warn">Choose a specific channel (not "all channels") for this mode.</Notice>}
           {scope === 'range' && (
             <div className="grid-fields">
-              <Field label="Limite maximale (optionnel)" hint={limitValue ? `Maximum ${nf(limitValue)} messages.` : 'Laisser vide = aucun maximum.'}>
-                <input type="number" min="1" value={maxMessages} onChange={(e) => setMaxMessages(e.target.value)} placeholder="Aucun maximum" />
+              <Field label="Maximum limit (optional)" hint={limitValue ? `Maximum ${nf(limitValue)} messages.` : "Leave blank for no limit."}>
+                <input type="number" min="1" value={maxMessages} onChange={(e) => setMaxMessages(e.target.value)} placeholder="No limit" />
               </Field>
             </div>
           )}
@@ -709,68 +709,68 @@ function DiscordManager() {
 
         {scope !== 'selection' && (
           <fieldset className="fieldset">
-            <legend className="field-label">Protections</legend>
-            <label className="check"><input type="checkbox" checked={keepPinned} onChange={(e) => setKeepPinned(e.target.checked)} /><span>Conserver les messages épinglés</span></label>
-            <label className="check"><input type="checkbox" checked={onlyAttachments} onChange={(e) => setOnlyAttachments(e.target.checked)} /><span>Seulement les messages avec pièce jointe</span></label>
-            <Field label="Ne jamais toucher aux messages contenant" hint="Mots ou expressions séparés par des virgules (50 maximum).">
-              <input value={excludeWords} onChange={(e) => setExcludeWords(e.target.value)} placeholder="anniversaire, adresse, ..." />
+            <legend className="field-label">Safeguards</legend>
+            <label className="check"><input type="checkbox" checked={keepPinned} onChange={(e) => setKeepPinned(e.target.checked)} /><span>Keep pinned messages</span></label>
+            <label className="check"><input type="checkbox" checked={onlyAttachments} onChange={(e) => setOnlyAttachments(e.target.checked)} /><span>Only messages with attachments</span></label>
+            <Field label="Never change messages containing" hint="Comma-separated words or phrases (up to 50).">
+              <input value={excludeWords} onChange={(e) => setExcludeWords(e.target.value)} placeholder="birthday, address, ..." />
             </Field>
           </fieldset>
         )}
 
         <SpeedPicker speed={speed} setSpeed={setSpeed} />
-        {eta && <p className="muted small">Durée estimée : environ {fmtDuration(eta)} (hors limitations Discord).</p>}
+        {eta && <p className="muted small">Estimated duration: about {fmtDuration(eta)} (excluding Discord rate limits).</p>}
 
         <fieldset className="fieldset">
-          <legend className="field-label">Édition en masse</legend>
+          <legend className="field-label">Bulk edit</legend>
           <div className="grid-fields">
-            <Select label="Mode d’édition" value={editMode} onChange={setEditMode} options={EDIT_MODES} />
+            <Select label="Edit mode" value={editMode} onChange={setEditMode} options={EDIT_MODES} />
             {editMode === 'replace' ? (
               <>
-                <Field label="Texte à chercher"><input value={find} onChange={(e) => setFind(e.target.value)} /></Field>
-                <Field label="Remplacer par"><input value={replace} onChange={(e) => setReplace(e.target.value)} /></Field>
+                <Field label="Text to find"><input value={find} onChange={(e) => setFind(e.target.value)} /></Field>
+                <Field label="Replace with"><input value={replace} onChange={(e) => setReplace(e.target.value)} /></Field>
               </>
             ) : (
-              <Field label="Texte"><input value={text} onChange={(e) => setText(e.target.value)} /></Field>
+              <Field label="Text"><input value={text} onChange={(e) => setText(e.target.value)} /></Field>
             )}
           </div>
-          <p className="muted small">Seuls vos propres messages peuvent être édités.</p>
+          <p className="muted small">Only your own messages can be edited.</p>
         </fieldset>
 
         {actionErr && <Notice tone="error">{actionErr}</Notice>}
         {pending && (
           <div className="notice warn row wrap" role="status" aria-live="polite">
-            <span className="grow">{pending.kind === 'edit' ? 'Édition' : 'Suppression'} lancée dans {Math.max(0, Math.ceil((pending.at - nowTick) / 1000))} s. Aucune requête n’a encore été envoyée.</span>
-            <button type="button" className="btn sm" onClick={() => setPending(null)}>Annuler</button>
-            <button type="button" className="btn sm danger-solid" onClick={() => { const p = pending; setPending(null); launch(p); }}>Lancer maintenant</button>
+            <span className="grow">{pending.kind === 'edit' ? "Editing" : "Deletion"} starts in {Math.max(0, Math.ceil((pending.at - nowTick) / 1000))} s. No requests have been sent yet.</span>
+            <button type="button" className="btn sm" onClick={() => setPending(null)}>Cancel</button>
+            <button type="button" className="btn sm danger-solid" onClick={() => { const p = pending; setPending(null); launch(p); }}>Start now</button>
           </div>
         )}
         <div className="actions">
           <button type="button" className="btn danger-solid" disabled={!readyBase || !!pending} onClick={() => setConfirm('delete')}>
-            <Icon name="trash" size={16} /> Supprimer en masse
+            <Icon name="trash" size={16} /> Bulk delete
           </button>
           <button type="button" className="btn" disabled={!readyBase || !editValid || !!pending} onClick={() => setConfirm('edit')}>
-            <Icon name="edit" size={16} /> Éditer en masse
+            <Icon name="edit" size={16} /> Bulk edit
           </button>
         </div>
       </Card>
 
-      <Card id="discord-jobs" title="4. Suivi des opérations" actions={<button type="button" className="btn sm" onClick={() => recent.reload(true)}><Icon name="refresh" size={14} /> Actualiser</button>}>
+      <Card id="discord-jobs" title="4. Operation progress" actions={<button type="button" className="btn sm" onClick={() => recent.reload(true)}><Icon name="refresh" size={14} /> Refresh</button>}>
         {jobIds.length === 0 && recentJobs.length === 0 ? (
-          <EmptyState icon="clock" title="Aucun job">Les suppressions et éditions lancées apparaîtront ici avec leur progression.</EmptyState>
+          <EmptyState icon="clock" title="No jobs">Deletion and editing jobs will appear here with their progress.</EmptyState>
         ) : (
           <div className="stack">
             {jobIds.map((id) => <JobPanel key={id} id={id} onCancelled={() => recent.reload(true)} />)}
             {recentJobs.filter((j) => !jobIds.includes(j.id)).length > 0 && (
               <>
-                <h3 className="sub-title">Jobs récents</h3>
+                <h3 className="sub-title">Recent jobs</h3>
                 <ul className="list">
                   {recentJobs.filter((j) => !jobIds.includes(j.id)).slice(0, 8).map((j) => (
                     <li key={j.id} className="row wrap">
-                      <span>{j.kind === 'edit' ? 'Édition' : 'Suppression'} · {fmtDate(j.createdAt)}</span>
+                      <span>{j.kind === 'edit' ? "Editing" : "Deletion"} · {fmtDate(j.createdAt)}</span>
                       <StatusBadge value={j.status} />
-                      <span className="muted small grow">{nf(j.deleted)} suppr. · {nf(j.edited)} édités · {nf(j.failed)} échecs</span>
-                      <button type="button" className="btn sm" onClick={() => setJobIds((p) => [j.id, ...p])}>Suivre</button>
+                      <span className="muted small grow">{nf(j.deleted)} deleted · {nf(j.edited)} edited · {nf(j.failed)} failures</span>
+                      <button type="button" className="btn sm" onClick={() => setJobIds((p) => [j.id, ...p])}>Track</button>
                     </li>
                   ))}
                 </ul>
@@ -790,45 +790,45 @@ function DiscordManager() {
 
       <Confirm
         open={confirm === 'delete'}
-        title="Confirmer la suppression en masse"
-        confirmLabel="Supprimer définitivement"
+        title="Confirm bulk deletion"
+        confirmLabel="Delete permanently"
         danger
-        requireText="SUPPRIMER"
+        requireText="DELETE"
         busy={launching}
         onCancel={() => setConfirm(null)}
         onConfirm={schedule}
       >
         <ul className="summary">
-          <li><strong>Cible :</strong> {targetLabel || 'salon sélectionné'}</li>
-          <li><strong>Portée :</strong> {scopeDescription()}</li>
-          <li><strong>Vitesse :</strong> {SPEEDS[speed.mode].label} ({sp.delayMs} ms, concurrence {sp.concurrency})</li>
+          <li><strong>Target:</strong> {targetLabel || "selected channel"}</li>
+          <li><strong>Scope:</strong> {scopeDescription()}</li>
+          <li><strong>Speed:</strong> {SPEEDS[speed.mode].label} ({sp.delayMs} ms, concurrency {sp.concurrency})</li>
           {scope !== 'selection' && (keepPinned || onlyAttachments || excludeWords.trim()) && (
-            <li><strong>Protections :</strong> {[keepPinned && 'épinglés conservés', onlyAttachments && 'pièces jointes seulement', excludeWords.trim() && `mots exclus : ${excludeWords.trim()}`].filter(Boolean).join(' · ')}</li>
+            <li><strong>Safeguards:</strong> {[keepPinned && "pinned messages kept", onlyAttachments && "attachments only", excludeWords.trim() && `excluded words: ${excludeWords.trim()}`].filter(Boolean).join(' · ')}</li>
           )}
         </ul>
         <PreviewBox preview={preview} />
-        <Notice tone="warn">Les messages supprimés sur Discord ne peuvent pas être restaurés. Une copie est conservée dans l’archive locale.</Notice>
+        <Notice tone="warn">Messages deleted from Discord cannot be restored. A copy is kept in the local archive.</Notice>
       </Confirm>
       <Confirm
         open={confirm === 'edit'}
-        title="Confirmer l’édition en masse"
-        confirmLabel="Éditer les messages"
+        title="Confirm bulk edit"
+        confirmLabel="Edit messages"
         danger
-        requireText="MODIFIER"
+        requireText="EDIT"
         busy={launching}
         onCancel={() => setConfirm(null)}
         onConfirm={schedule}
       >
         <ul className="summary">
-          <li><strong>Cible :</strong> {targetLabel || 'salon sélectionné'}</li>
-          <li><strong>Portée :</strong> {scopeDescription()}</li>
+          <li><strong>Target:</strong> {targetLabel || "selected channel"}</li>
+          <li><strong>Scope:</strong> {scopeDescription()}</li>
           <li>
-            <strong>Modification :</strong>{' '}
-            {editMode === 'replace' ? `remplacer « ${find} » par « ${replace} »` : `${EDIT_MODES.find((m) => m.value === editMode)?.label.toLowerCase()} : « ${text} »`}
+            <strong>Change:</strong>{' '}
+            {editMode === 'replace' ? `replace "${find}" with "${replace}"` : `${EDIT_MODES.find((m) => m.value === editMode)?.label.toLowerCase()}: "${text}"`}
           </li>
-          <li><strong>Vitesse :</strong> {SPEEDS[speed.mode].label} ({sp.delayMs} ms, concurrence {sp.concurrency})</li>
+          <li><strong>Speed:</strong> {SPEEDS[speed.mode].label} ({sp.delayMs} ms, concurrency {sp.concurrency})</li>
         </ul>
-        <Notice tone="warn">Le contenu original est sauvegardé dans l’archive locale, mais l’édition sur Discord est définitive.</Notice>
+        <Notice tone="warn">The original content is saved in the local archive, but edits on Discord are permanent.</Notice>
       </Confirm>
     </>
   );
@@ -836,15 +836,15 @@ function DiscordManager() {
 
 function PreviewBox({ preview }) {
   if (!preview) return null;
-  if (preview.loading) return <p className="muted small">Aperçu en cours (une recherche Discord, aucune suppression)…</p>;
-  if (preview.error) return <Notice tone="warn">Aperçu indisponible : {preview.error}</Notice>;
+  if (preview.loading) return <p className="muted small">Loading preview (one Discord search, no deletion)…</p>;
+  if (preview.error) return <Notice tone="warn">Preview unavailable: {preview.error}</Notice>;
   return (
     <div className="preview-box">
-      <p><strong>Aperçu :</strong> environ {nf(preview.total)} message(s) à vous{preview.filtered ? ' avant application des protections' : ''}.</p>
+      <p><strong>Preview:</strong> about {nf(preview.total)} of your messages{preview.filtered ? " before safeguards" : ''}.</p>
       {preview.sample?.length > 0 && (
         <ul className="preview-list">
           {preview.sample.map((m) => (
-            <li key={m.id}><span className="muted small">{fmtDate(msgDate(m))}</span> {msgText(m) || '(sans texte)'}</li>
+            <li key={m.id}><span className="muted small">{fmtDate(msgDate(m))}</span> {msgText(m) || "(no text)"}</li>
           ))}
         </ul>
       )}
@@ -857,16 +857,16 @@ export function RateStatus() {
   if (!r) return null;
   return <div className="rate-status" role="status">
     <span className={`dot ${r.globalWaitMs ? 'down' : 'up'}`} />
-    <strong>{r.globalWaitMs ? `Pause Discord · ${Math.ceil(r.globalWaitMs / 1000)} s` : 'Régulation adaptative active'}</strong>
-    <span className="grow muted small">{r.queued} requête(s) en attente · {r.waitingBuckets} quota(s) en temporisation</span>
-    <span className="muted small" title="Plafond conservateur de l’application, les quotas Discord restent prioritaires">Plafond app : {r.cap} req/s</span>
+    <strong>{r.globalWaitMs ? `Discord pause · ${Math.ceil(r.globalWaitMs / 1000)} s` : "Adaptive rate limiting active"}</strong>
+    <span className="grow muted small">{r.queued} pending requests · {r.waitingBuckets} rate limits on cooldown</span>
+    <span className="muted small" title="Conservative app limit; Discord rate limits take priority">App limit: {r.cap} req/s</span>
   </div>;
 }
 
 export default function Discord() {
   return (
     <>
-      <PageHeader title="Votre historique, sous contrôle" subtitle="Discord · Recherchez, archivez et nettoyez vos propres messages." />
+      <PageHeader title="Your history, under your control" subtitle="Discord · Search, archive, and clean up your own messages." />
       <DiscordGate>
         <RateStatus /><DiscordManager />
       </DiscordGate>

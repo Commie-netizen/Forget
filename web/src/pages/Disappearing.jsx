@@ -9,9 +9,9 @@ import Badge from '../components/Badge.jsx';
 import { fmtDuration } from '../lib.js';
 
 const SCOPES = [
-  { value: 'all', label: 'Tous mes messages (serveurs et MP)' },
-  { value: 'guilds', label: 'Serveurs sélectionnés' },
-  { value: 'dm', label: 'Messages privés uniquement' },
+  { value: 'all', label: "All my messages (servers and DMs)" },
+  { value: 'guilds', label: "Selected servers" },
+  { value: 'dm', label: "Direct messages only" },
 ];
 
 function splitDelay(sec) {
@@ -33,7 +33,7 @@ function DisappearingPanel() {
   const [saved, setSaved] = useState(false);
 
   const d = state.data;
-  // Synchronise le formulaire avec le serveur tant que l'utilisateur n'a rien modifié.
+  // Sync the form with the server until the user makes changes.
   useEffect(() => {
     if (!d) return;
     setEnabled(!!d.enabled);
@@ -75,46 +75,46 @@ function DisappearingPanel() {
     <>
       {(state.error || error) && <Notice tone="error">{error || state.error}</Notice>}
       <Card
-        title="Mode disparition"
-        subtitle="Supprime automatiquement vos nouveaux messages après un délai."
-        actions={<Toggle checked={enabled} onChange={toggle} disabled={busy || !d} label="Activer le mode disparition" />}
+        title="Disappearing Mode"
+        subtitle="Automatically delete your new messages after a delay."
+        actions={<Toggle checked={enabled} onChange={toggle} disabled={busy || !d} label="Enable Disappearing Mode" />}
       >
         <div className="row">
-          <span className="muted small">État du watcher :</span>
+          <span className="muted small">Watcher status:</span>
           {!d ? (
-            <Badge>Chargement</Badge>
+            <Badge>Loading</Badge>
           ) : enabled && running ? (
-            <Badge tone="green">Actif · gateway connecté</Badge>
+            <Badge tone="green">Active · gateway connected</Badge>
           ) : enabled ? (
-            <Badge tone="orange">Activé · connexion au gateway...</Badge>
+            <Badge tone="orange">Enabled · connecting to gateway...</Badge>
           ) : (
-            <Badge>Arrêté</Badge>
+            <Badge>Stopped</Badge>
           )}
         </div>
-        {enabled && <p className="muted small">Chaque nouveau message envoyé sera supprimé après {fmtDuration(d?.delaySec || delaySec)}.</p>}
+        {enabled && <p className="muted small">Each new message will be deleted after {fmtDuration(d?.delaySec || delaySec)}.</p>}
       </Card>
 
-      <Card title="Réglages">
+      <Card title="Settings">
         <div className="stack">
           <div className="grid-fields">
-            <Field label="Délai avant suppression">
+            <Field label="Delay before deletion">
               <input type="number" min="1" value={delay} onChange={(e) => mark(setDelay)(e.target.value)} />
             </Field>
             <Select
-              label="Unité"
+              label="Unit"
               value={unit}
               onChange={mark(setUnit)}
-              options={[{ value: 's', label: 'Secondes' }, { value: 'min', label: 'Minutes' }]}
+              options={[{ value: 's', label: "Seconds" }, { value: 'min', label: "Minutes" }]}
             />
-            <Select label="Portée" value={scope} onChange={mark(setScope)} options={SCOPES} />
+            <Select label="Scope" value={scope} onChange={mark(setScope)} options={SCOPES} />
           </div>
           {scope === 'guilds' && (
             <fieldset className="fieldset">
-              <legend className="field-label">Serveurs concernés</legend>
+              <legend className="field-label">Servers to include</legend>
               {guilds.loading ? (
-                <p className="muted small">Chargement...</p>
+                <p className="muted small">Loading...</p>
               ) : guildList.length === 0 ? (
-                <p className="muted small">{guilds.error || 'Aucun serveur disponible.'}</p>
+                <p className="muted small">{guilds.error || "No servers available."}</p>
               ) : (
                 <div className="check-grid">
                   {guildList.map((g) => (
@@ -129,18 +129,18 @@ function DisappearingPanel() {
                   ))}
                 </div>
               )}
-              {guildIds.length === 0 && <Notice tone="warn">Aucun serveur coché : rien ne sera supprimé.</Notice>}
+              {guildIds.length === 0 && <Notice tone="warn">No servers selected: nothing will be deleted.</Notice>}
             </fieldset>
           )}
           <div className="actions">
-            <button type="button" className="btn primary" disabled={busy || !dirty} onClick={apply}>Appliquer</button>
-            {saved && <span className="c-green small" role="status">Réglages enregistrés.</span>}
+            <button type="button" className="btn primary" disabled={busy || !dirty} onClick={apply}>Apply</button>
+            {saved && <span className="c-green small" role="status">Settings saved.</span>}
           </div>
         </div>
       </Card>
 
-      <Notice tone="warn" title="Fonctionne tant que l’application tourne">
-        Le watcher écoute le gateway Discord depuis cette machine. Si l’application est fermée, les messages ne seront pas supprimés.
+      <Notice tone="warn" title="Runs while the app is open">
+        The watcher listens to the Discord gateway from this computer. Messages will not be deleted while the app is closed.
       </Notice>
     </>
   );
@@ -149,7 +149,7 @@ function DisappearingPanel() {
 export default function Disappearing() {
   return (
     <>
-      <PageHeader title="Disappearing Mode" subtitle="Vos messages s’effacent tout seuls." />
+      <PageHeader title="Disappearing Mode" subtitle="Your messages disappear automatically." />
       <DiscordGate>
         <DisappearingPanel />
       </DiscordGate>

@@ -31,7 +31,7 @@ export class RateLimiter {
       for (let i = 0; i < this.queue.length;) {
         const task = this.queue[i], b = this.bucket(task.route);
         if (task.shouldStop()) {
-          this.queue.splice(i, 1); task.reject(Object.assign(new Error('Opération annulée'), { status: 499 })); continue;
+          this.queue.splice(i, 1); task.reject(Object.assign(new Error('Operation cancelled'), { status: 499 })); continue;
         }
         if (b.busy || now < Math.max(this.globalUntil, b.until) || this.starts.length >= this.cap) { i++; continue; }
         this.queue.splice(i, 1); b.busy = true; this.starts.push(now); this.requests++;

@@ -1,4 +1,4 @@
-// Entrée : app Hono, routes /api, statique web/dist (fallback SPA).
+// Entry point: Hono app, /api routes, static web/dist (SPA fallback).
 import { Hono } from 'hono';
 import { serve } from '@hono/node-server';
 import { readFile, stat } from 'node:fs/promises';
@@ -16,7 +16,7 @@ import { installNetworkGuard, privacyRouter } from './privacy.mjs';
 import { securityMiddleware } from './security.mjs';
 
 const here = dirname(fileURLToPath(import.meta.url));
-// WEB_DIST_DIR permet au packaging (exe) d'imposer un autre dossier statique.
+// WEB_DIST_DIR lets packaging (exe) override the static directory.
 const WEB_DIST = process.env.WEB_DIST_DIR
   ? resolve(process.env.WEB_DIST_DIR)
   : resolve(here, '..', '..', 'web', 'dist');
@@ -32,30 +32,30 @@ async function readIfFile(path) {
 }
 
 export function createApp({ webDist = WEB_DIST } = {}) {
-  const db = getDb(); // ouvre la base + migrations
-  installNetworkGuard(db); // verrou réseau (hors-ligne par défaut)
+  const db = getDb(); // open database and run migrations
+  installNetworkGuard(db); // network lock (offline by default)
   recoverInterrupted();
-  initDiscord(db); // tables + reprise éventuelle du mode disparition
-  initImport(db); // tables d'import d'export Discord / base Forget Engine
+  initDiscord(db); // tables and optional resumption of disappearing mode
+  initImport(db); // Discord export / Forget Engine database import tables
 
   const app = new Hono();
-  app.use('*', securityMiddleware()); // DNS rebinding, CSRF, en-têtes de sécurité : AVANT toute route
+  app.use('*', securityMiddleware()); // DNS rebinding, CSRF, security headers: BEFORE any route
   app.route('/api', buildRoutes());
   app.route('/api/privacy', privacyRouter(db));
-  app.route('/api/discord', discordRouter()); // avant le wildcard 404
+  app.route('/api/discord', discordRouter()); // before the wildcard 404
   app.route('/api/import', importRouter(db));
   app.route('/api/social', socialRouter(db));
   app.route('/api/update', updateRouter(db));
   app.route('/api/tiktok', tiktokRouter(db));
   app.get('/api/security', (c) => c.json(securityInfo()));
-  app.all('/api/*', (c) => c.json({ error: 'route introuvable' }, 404)); // le notFound du sous-app n'est pas hérité
+  app.all('/api/*', (c) => c.json({ error: 'route not found' }, 404)); // the sub-app's notFound handler is not inherited
 
   app.get('*', async (c) => {
     const index = await readIfFile(join(webDist, 'index.html'));
     if (!index) return c.json({ error: 'web/dist absent - lance npm run build' }, 503);
     let decoded;
-    try { decoded = decodeURIComponent(new URL(c.req.url).pathname); } catch { return c.json({ error: 'chemin invalide' }, 400); }
-    if (decoded.includes('\0')) return c.json({ error: 'chemin invalide' }, 400);
+    try { decoded = decodeURIComponent(new URL(c.req.url).pathname); } catch { return c.json({ error: 'invalid path' }, 400); }
+    if (decoded.includes('\0')) return c.json({ error: 'invalid path' }, 400);
     const root = resolve(webDist);
     const rel = normalize(decoded).replace(/^[/\\]+/, '');
     const full = resolve(root, rel);
@@ -64,14 +64,14 @@ export function createApp({ webDist = WEB_DIST } = {}) {
     }
     const file = await readIfFile(full);
     if (file) return new Response(file, { headers: { 'Content-Type': MIME[extname(full).toLowerCase()] ?? 'application/octet-stream' } });
-    // Fallback SPA, sauf pour les assets manquants (extension) : 404.
-    if (extname(full)) return c.json({ error: 'fichier introuvable' }, 404);
+    // SPA fallback, except missing assets (with extensions): 404.
+    if (extname(full)) return c.json({ error: 'file not found' }, 404);
     return new Response(index, { headers: { 'Content-Type': MIME['.html'] } });
   });
   return app;
 }
 
-// Démarrage seulement si lancé directement (node src/index.mjs).
+// Start only when launched directly (node src/index.mjs).
 if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
   const { startScheduler } = await import('./engine.mjs');
   const { stopDiscord } = await import('./discord/index.mjs');

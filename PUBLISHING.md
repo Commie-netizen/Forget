@@ -1,45 +1,45 @@
-# Checklist de publication (mainteneurs)
+# Publishing checklist (maintainers)
 
-## Ne jamais committer
+## Never commit
 
-- Bases SQLite utilisateur : `*.sqlite*`, `data/`, `%APPDATA%\forget-desktop\`.
-- Jetons, `.env`, clés, certificats, exports de sessions, captures contenant des données personnelles.
-- Sorties de build : `dist/`, `dist-desktop/`, `build/`, `*.exe`, `*.blockmap`.
-- `node_modules/`, journaux, notes de développement internes (`SPEC*.md`, `verify.mjs`, `packaging/`).
+- User SQLite databases: `*.sqlite*`, `data/`, `%APPDATA%\forget-desktop\`.
+- Tokens, `.env`, keys, certificates, session exports, screenshots containing personal data.
+- Build output: `dist/`, `dist-desktop/`, `build/`, `*.exe`, `*.blockmap`.
+- `node_modules/`, logs, internal development notes (`SPEC*.md`, `verify.mjs`, `packaging/`).
 
-## Première publication : un dépôt neuf, sans historique
+## First publication: a fresh repository with no history
 
-Publiez depuis un **nouveau** dépôt dont le premier commit contient l'état actuel du code. Ne poussez pas un
-historique local antérieur : il peut contenir des fichiers ou des chemins qui n'ont pas vocation à être publics.
+Publish from a **new** repository whose first commit contains the current code. Do not push
+older local history: it may contain files or paths that are not intended to be public.
 
 ```bash
-# depuis une COPIE propre du dossier du projet (sans .git)
+# from a clean COPY of the project folder (without .git)
 git init -b main
 git add .
-git status                 # relire TOUTE la liste
+git status                 # review the ENTIRE list
 git diff --cached --stat
 ```
 
-Vérifications (les deux commandes ne doivent rien afficher) :
+Checks (both commands should produce no output):
 
 ```bash
 git ls-files | grep -iE "sqlite|\.env|\.exe|dist-desktop|node_modules|SPEC|verify\.mjs|packaging/"
 git grep -iE "(token|secret|password|client_secret)\s*[:=]\s*['\"][A-Za-z0-9._-]{20,}"
 ```
 
-Puis `git commit`, `git remote add origin <url>`, `git push -u origin main`.
+Then `git commit`, `git remote add origin <url>`, `git push -u origin main`.
 
-## Réglages du dépôt GitHub
+## GitHub repository settings
 
-- Activer « Private vulnerability reporting », Dependabot alerts et Dependabot security updates.
-- Protéger la branche `main` (revue obligatoire, pas de force-push) et limiter qui peut créer des tags `v*`.
-- Actions : laisser les permissions par défaut en lecture seule ; seul le workflow Release demande `contents: write`.
-- Les actions sont épinglées par SHA de commit : les mettre à jour volontairement (Dependabot peut le proposer).
+- Enable "Private vulnerability reporting", Dependabot alerts, and Dependabot security updates.
+- Protect the `main` branch (required review, no force-push) and restrict who can create `v*` tags.
+- Actions: keep default permissions read-only; only the Release workflow requests `contents: write`.
+- Actions are pinned by commit SHA: update them deliberately (Dependabot can suggest updates).
 
 ## Releases
 
-- Mettre la version partout (voir README, section « Publier une version ») et compléter `CHANGELOG.md`.
-- `git tag vX.Y.Z` puis `git push origin vX.Y.Z` : le workflow `Release` publie `Forget-X.Y.Z.exe` et `SHA256SUMS.txt`.
-- Le bouton « Mettre à jour » attend exactement ces deux fichiers dans la dernière release (non brouillon, non pré-release).
-- Le SHA-256 protège contre un téléchargement corrompu ou altéré en transit, pas contre un compte GitHub compromis :
-  protégez le compte (2FA, clé matérielle) et les tags.
+- Set the version everywhere (see the README's "Publish a release" section) and update `CHANGELOG.md`.
+- `git tag vX.Y.Z` then `git push origin vX.Y.Z`: the `Release` workflow publishes `Forget-X.Y.Z.exe` and `SHA256SUMS.txt`.
+- The "Update" button expects exactly these two files in the latest release (not a draft or prerelease).
+- SHA-256 protects against downloads that are corrupted or tampered with in transit, not a compromised GitHub account:
+  protect the account (2FA, hardware key) and tags.

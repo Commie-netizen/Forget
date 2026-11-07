@@ -1,4 +1,4 @@
-// Routes HTTP /api (contrat SPEC). Validation manuelle, erreurs JSON { error }.
+// HTTP /api routes (SPEC contract). Manual validation, JSON errors { error }.
 import { Hono } from 'hono';
 import * as repo from './repo.mjs';
 import * as engine from './engine.mjs';
@@ -7,35 +7,35 @@ import { csvCell } from './csv.mjs';
 
 const fail = (status, message) => new engine.EngineError(status, message);
 
-// Corps JSON : {} si vide, 400 si invalide ou non-objet.
+// JSON body: {} if empty, 400 if invalid or not an object.
 async function readBody(c) {
   const raw = await c.req.text();
   if (!raw.trim()) return {};
   let v;
-  try { v = JSON.parse(raw); } catch { throw fail(400, 'JSON invalide'); }
-  if (!v || typeof v !== 'object' || Array.isArray(v)) throw fail(400, 'le corps doit être un objet JSON');
+  try { v = JSON.parse(raw); } catch { throw fail(400, 'invalid JSON'); }
+  if (!v || typeof v !== 'object' || Array.isArray(v)) throw fail(400, 'the body must be a JSON object');
   return v;
 }
 
 const isStr = (v) => typeof v === 'string' && v.trim() !== '';
 const isStrArray = (v) => Array.isArray(v) && v.every((x) => typeof x === 'string');
 
-// Valide les champs de profil ; `partial` autorise l'absence de primaryName.
+// Validate profile fields; partial allows primaryName to be absent.
 function profileFields(b, partial) {
-  if (!partial && !isStr(b.primaryName)) throw fail(400, 'primaryName requis');
-  if (partial && b.primaryName !== undefined && !isStr(b.primaryName)) throw fail(400, 'primaryName invalide');
+  if (!partial && !isStr(b.primaryName)) throw fail(400, 'primaryName is required');
+  if (partial && b.primaryName !== undefined && !isStr(b.primaryName)) throw fail(400, 'invalid primaryName');
   for (const k of ['emails', 'phones']) {
-    if (b[k] !== undefined && !isStrArray(b[k])) throw fail(400, `${k} doit être un tableau de chaînes`);
+    if (b[k] !== undefined && !isStrArray(b[k])) throw fail(400, `${k} must be an array of strings`);
   }
   for (const k of ['primaryAddress', 'dateOfBirth']) {
-    if (b[k] != null && typeof b[k] !== 'string') throw fail(400, `${k} doit être une chaîne`);
+    if (b[k] != null && typeof b[k] !== 'string') throw fail(400, `${k} must be a string`);
   }
   const out = {};
   for (const k of ['primaryName', 'primaryAddress', 'dateOfBirth', 'emails', 'phones']) if (b[k] !== undefined) out[k] = b[k];
   return out;
 }
 
-const found = (v, what) => { if (!v) throw fail(404, `${what} introuvable`); return v; };
+const found = (v, what) => { if (!v) throw fail(404, `${what} not found`); return v; };
 
 // ---- Export ----
 const toCsv = (rows, cols) => [cols.join(','), ...rows.map((r) => cols.map((c) => csvCell(r[c])).join(','))].join('\r\n') + '\r\n';
@@ -63,7 +63,7 @@ function exportData() {
 
 const RESULT_COLS = ['id', 'clawName', 'profileName', 'profileUrl', 'names', 'age', 'addresses', 'relatives', 'emails', 'phones', 'hash', 'createdAt'];
 
-// ZIP minimal "maison" : entrées stockées (méthode 0, sans compression), noms UTF-8.
+// Minimal custom ZIP: stored entries (method 0, no compression), UTF-8 names.
 const CRC_TABLE = Array.from({ length: 256 }, (_, n) => {
   let c = n;
   for (let k = 0; k < 8; k++) c = c & 1 ? 0xedb88320 ^ (c >>> 1) : c >>> 1;
@@ -106,18 +106,18 @@ export function buildZip(files) { // files: [{ name, data: string|Buffer }]
 // ---- Routes ----
 export function buildRoutes() {
   const api = new Hono();
-  // Pas de CORS : l'interface est servie par ce même serveur (et par le proxy Vite en dev). Voir security.mjs.
+  // No CORS: the UI is served by this server (and by the Vite proxy in development). See security.mjs.
 
   api.onError((err, c) => {
     if (err instanceof engine.EngineError) return c.json({ error: err.message }, err.status);
     console.error('[api]', err);
-    return c.json({ error: 'erreur interne' }, 500);
+    return c.json({ error: 'internal error' }, 500);
   });
-  api.notFound((c) => c.json({ error: 'route introuvable' }, 404));
+  api.notFound((c) => c.json({ error: 'route not found' }, 404));
 
   api.get('/health', (c) => c.json({ ok: true, version: VERSION, mode: 'demo' }));
 
-  // Profils
+  // Profiles
   api.get('/profiles', (c) => c.json(repo.listProfiles()));
   api.post('/profiles', async (c) => c.json(repo.createProfile(profileFields(await readBody(c), false)), 201));
   api.get('/profiles/:id', (c) => c.json(found(repo.getProfile(c.req.param('id')), 'profil')));
@@ -130,9 +130,9 @@ export function buildRoutes() {
     return c.json({ ok: true });
   });
 
-  // Catalogues, scan
+  // Catalogs, scan
   api.get('/claws', (c) => c.json(repo.listClaws()));
-  // Scan massif : un scanJob par broker activé, sans limite de nombre.
+  // Bulk scan: one scanJob per enabled broker, with no count limit.
   api.post('/claws/scan-all', async (c) => {
     const b = await readBody(c);
     if (!isStr(b.profileId) || !repo.getProfile(b.profileId)) throw fail(400, 'profileId absent ou profil inconnu');
@@ -140,14 +140,14 @@ export function buildRoutes() {
     for (const claw of repo.listClaws()) {
       if (claw.enabled === false) continue;
       try { jobIds.push(engine.startScan(b.profileId, claw.id).id); } catch (e) {
-        if (!(e instanceof engine.EngineError) || e.status !== 409) throw e; // scan déjà actif : ignoré
+        if (!(e instanceof engine.EngineError) || e.status !== 409) throw e; // scan already active: skip
       }
     }
     return c.json({ jobIds, total: jobIds.length }, 201);
   });
   api.post('/claws/:id/scan', async (c) => {
     const b = await readBody(c);
-    if (!isStr(b.profileId)) throw fail(400, 'profileId requis');
+    if (!isStr(b.profileId)) throw fail(400, 'profileId is required');
     return c.json(engine.startScan(b.profileId, c.req.param('id')), 201);
   });
   api.get('/scan-jobs', (c) => c.json(repo.listScanJobs()));
@@ -156,13 +156,13 @@ export function buildRoutes() {
     return c.json({ ...job, results: repo.listScanResults(job.id) });
   });
   api.get('/scan-results/:id', (c) => {
-    const r = found(repo.getScanResult(c.req.param('id')), 'résultat');
+    const r = found(repo.getScanResult(c.req.param('id')), 'result');
     return c.json({ ...r, screenshots: repo.listScreenshots(r.id) });
   });
   api.post('/scan-results/:id/removal', (c) => c.json(engine.startRemoval(c.req.param('id')), 201));
   api.get('/removal-jobs', (c) => c.json(repo.listRemovalJobs()));
   api.get('/removal-jobs/:id', (c) => {
-    const job = found(repo.getRemovalJob(c.req.param('id')), 'suppression');
+    const job = found(repo.getRemovalJob(c.req.param('id')), 'removal');
     return c.json({ ...job, steps: repo.listRemovalSteps(job.id) });
   });
 
@@ -170,7 +170,7 @@ export function buildRoutes() {
   api.get('/axes', (c) => c.json(repo.listAxes()));
   api.post('/axes/:id/connect', async (c) => {
     const b = await readBody(c);
-    if (!isStr(b.displayName)) throw fail(400, 'displayName requis');
+    if (!isStr(b.displayName)) throw fail(400, 'displayName is required');
     return c.json(engine.connectAxe(c.req.param('id'), b.displayName.trim()), 201);
   });
   api.get('/axes/:id/accounts', (c) => {
@@ -179,7 +179,7 @@ export function buildRoutes() {
   });
   api.post('/axes/:id/archive', async (c) => {
     const b = await readBody(c);
-    if (!isStr(b.accountId)) throw fail(400, 'accountId requis');
+    if (!isStr(b.accountId)) throw fail(400, 'accountId is required');
     return c.json(engine.startArchive(c.req.param('id'), b.accountId), 201);
   });
   api.get('/axe-jobs', (c) => c.json(repo.listAxeJobs()));
@@ -187,9 +187,9 @@ export function buildRoutes() {
     const job = found(repo.getAxeJob(c.req.param('id')), 'job axe');
     return c.json({ ...job, things: repo.listThings(job.id) });
   });
-  // Corps optionnel { marked:false } pour démarquer.
+  // Optional body { marked:false } to unmark.
   api.post('/things/:id/mark', async (c) => {
-    found(repo.getThing(c.req.param('id')), 'élément');
+    found(repo.getThing(c.req.param('id')), 'item');
     const b = await readBody(c);
     return c.json(repo.markThing(c.req.param('id'), b.marked !== false));
   });
@@ -200,8 +200,8 @@ export function buildRoutes() {
   api.post('/schedules', async (c) => {
     const b = await readBody(c);
     if (b.kind !== 'scan' && b.kind !== 'axe') throw fail(400, 'kind doit valoir "scan" ou "axe"');
-    if (!isStr(b.targetId)) throw fail(400, 'targetId requis');
-    if (!isStr(b.cron)) throw fail(400, 'cron requis');
+    if (!isStr(b.targetId)) throw fail(400, 'targetId is required');
+    if (!isStr(b.cron)) throw fail(400, 'cron is required');
     return c.json(engine.createSchedule({ kind: b.kind, targetId: b.targetId.trim(), cron: b.cron.trim() }), 201);
   });
   api.delete('/schedules/:id', (c) => {
@@ -236,18 +236,18 @@ export function buildRoutes() {
 
   api.get('/events', (c) => {
     const n = Number(c.req.query('limit') ?? 50);
-    if (!Number.isInteger(n) || n < 1) throw fail(400, 'limit invalide');
+    if (!Number.isInteger(n) || n < 1) throw fail(400, 'invalid limit');
     return c.json(repo.listEvents(Math.min(n, 500)));
   });
 
-  // Réglages
+  // Settings
   api.get('/settings', (c) => c.json(repo.getSettings()));
   api.patch('/settings', async (c) => {
     const b = await readBody(c);
     if (b.theme !== undefined && b.theme !== 'dark' && b.theme !== 'light') throw fail(400, 'theme doit valoir "dark" ou "light"');
-    if (b.mode !== undefined && b.mode !== 'demo') throw fail(400, 'seul le mode "demo" est supporté');
-    // Les clés réservées (confidentialité, comptes, mises à jour) ont leurs propres routes validées.
-    if (Object.keys(b).some((k) => /^(privacy|discord|update|social|tiktok)\./.test(k))) throw fail(400, 'clé de réglage réservée');
+    if (b.mode !== undefined && b.mode !== 'demo') throw fail(400, 'only "demo" mode is supported');
+    // Reserved keys (privacy, accounts, updates) have their own validated routes.
+    if (Object.keys(b).some((k) => /^(privacy|discord|update|social|tiktok)\./.test(k))) throw fail(400, 'reserved setting key');
     return c.json(repo.patchSettings(b));
   });
 

@@ -1,6 +1,6 @@
 import React from 'react';
 
-// Icônes SVG inline (tracés 24x24, trait uniquement). Aucune ressource externe.
+// Inline SVG icons (24x24 paths, strokes only). No external resources.
 const PATHS = {
   home: 'M3 11l9-8 9 8M5 10v10h14V10',
   users: 'M16 11a4 4 0 10-8 0 4 4 0 008 0zM4 21c0-4 4-6 8-6s8 2 8 6',

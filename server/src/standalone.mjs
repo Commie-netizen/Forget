@@ -1,5 +1,5 @@
-// Point d'entree de l'exe unique (Node SEA). Assets UI embarques, base dans %APPDATA%.
-// Hors SEA (node server/src/standalone.mjs) : sert web/dist depuis le disque.
+// Single-executable entry point (Node SEA). Embedded UI assets, database in %APPDATA%.
+// Outside SEA (node server/src/standalone.mjs): serve web/dist from disk.
 import { Hono } from 'hono';
 import { serve } from '@hono/node-server';
 import { spawn } from 'node:child_process';
@@ -31,7 +31,7 @@ function parseArgs(argv) {
 const args = parseArgs(process.argv.slice(2));
 const port = args.port || Number(process.env.PORT) || 4173;
 if (!Number.isInteger(port) || port < 1 || port > 65535) {
-  console.error(`Port invalide : ${port}`);
+  console.error(`Invalid port: ${port}`);
   process.exit(2);
 }
 
@@ -73,7 +73,7 @@ const inner = createApp();
 let app = inner;
 
 if (sea.isSea()) {
-  const files = JSON.parse(sea.getAsset('manifest.json', 'utf8')); // chemins "assets/x.js", "index.html"
+  const files = JSON.parse(sea.getAsset('manifest.json', 'utf8')); // paths "assets/x.js", "index.html"
   const known = new Set(files);
   const send = (name) => new Response(sea.getRawAsset('web/' + name).slice(0), {
     headers: { 'Content-Type': MIME[extname(name).toLowerCase()] ?? 'application/octet-stream' },
@@ -84,8 +84,8 @@ if (sea.isSea()) {
     let rel;
     try { rel = decodeURIComponent(new URL(c.req.url).pathname).replace(/^\/+/, ''); } catch { rel = ''; }
     if (known.has(rel)) return send(rel);
-    if (extname(rel)) return c.json({ error: 'fichier introuvable' }, 404);
-    return send('index.html'); // fallback SPA
+    if (extname(rel)) return c.json({ error: 'file not found' }, 404);
+    return send('index.html'); // SPA fallback
   });
 }
 

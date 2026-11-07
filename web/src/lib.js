@@ -1,4 +1,4 @@
-// Utilitaires purs partagés par les pages.
+// Pure utilities shared by pages.
 
 export const APP_VERSION = '4.3.0';
 
@@ -11,14 +11,14 @@ export function toList(v) {
       if (Array.isArray(p)) return p.map(String);
       if (p && typeof p === 'object') return [];
     } catch {
-      /* chaîne simple */
+      /* plain string */
     }
     return v.split(',').map((s) => s.trim()).filter(Boolean);
   }
   return [];
 }
 
-// Accepte secondes, millisecondes ou chaîne ISO.
+// Accepts seconds, milliseconds, or an ISO string.
 export function toMs(ts) {
   if (ts == null || ts === '') return null;
   if (typeof ts === 'number') return ts < 1e12 ? ts * 1000 : ts;
@@ -33,7 +33,7 @@ export function toMs(ts) {
 export function fmtDate(ts) {
   const ms = toMs(ts);
   if (!ms) return '-';
-  return new Date(ms).toLocaleString('fr-FR', { dateStyle: 'short', timeStyle: 'medium' });
+  return new Date(ms).toLocaleString("en-US", { dateStyle: 'short', timeStyle: 'medium' });
 }
 
 export function fmtDuration(sec) {
@@ -43,9 +43,9 @@ export function fmtDuration(sec) {
   return `${Math.floor(sec / 3600)} h ${Math.round((sec % 3600) / 60)} min`;
 }
 
-export const nf = (n) => Number(n || 0).toLocaleString('fr-FR');
+export const nf = (n) => Number(n || 0).toLocaleString("en-US");
 
-// Date (ms) -> snowflake Discord. Sert aux bornes minId/maxId/before/after.
+// Date (ms) -> Discord snowflake. Used for minId/maxId/before/after bounds.
 const DISCORD_EPOCH = 1420070400000n;
 export function toSnowflake(ms) {
   if (!ms || ms < Number(DISCORD_EPOCH)) return '';
@@ -55,18 +55,18 @@ export const dayStartMs = (iso) => (iso ? new Date(`${iso}T00:00:00`).getTime() 
 export const dayEndMs = (iso) => (iso ? new Date(`${iso}T23:59:59.999`).getTime() : 0);
 
 export const JOB_LABEL = {
-  queued: 'En attente',
-  pending: 'En attente',
-  running: 'En cours',
-  cancelling: 'Annulation',
-  succeeded: 'Terminé',
-  completed: 'Terminé',
-  done: 'Terminé',
-  failed: 'Échec',
-  cancelled: 'Annulé',
-  canceled: 'Annulé',
+  queued: "Pending",
+  pending: "Pending",
+  running: "Running",
+  cancelling: "Cancelling",
+  succeeded: "Completed",
+  completed: "Completed",
+  done: "Completed",
+  failed: "Failed",
+  cancelled: "Cancelled",
+  canceled: "Cancelled",
   active: 'Active',
-  error: 'Erreur',
+  error: "Error",
 };
 export const JOB_TONE = {
   queued: 'neutral',
@@ -84,12 +84,12 @@ export const JOB_TONE = {
 };
 export const isActive = (s) => s === 'queued' || s === 'pending' || s === 'running' || s === 'cancelling';
 
-// Champs tolérants sur les messages normalisés renvoyés par le backend.
+// Tolerant field access for normalized messages returned by the backend.
 export const msgAuthor = (m) => m.author?.username || m.authorName || m.username || m.authorId || m.author?.id || '?';
 export const msgDate = (m) => m.timestamp || m.createdAt || m.messageCreatedAt || m.date;
 export const msgText = (m) => m.content ?? m.text ?? '';
 
-// Normalisation pour les filtres : minuscules, sans accents.
+// Normalize filters: lowercase, without accents.
 export const norm = (v) => String(v ?? '').normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase().trim();
 export const matches = (text, query) => {
   const q = norm(query);

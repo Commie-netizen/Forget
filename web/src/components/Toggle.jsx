@@ -1,6 +1,6 @@
 import React from 'react';
 
-// Interrupteur accessible (role=switch). `label` sert d'aria-label si aucun texte visible.
+// Accessible toggle (role=switch). `label` supplies the aria-label when no text is visible.
 export default function Toggle({ checked, onChange, label, disabled = false, id }) {
   return (
     <button

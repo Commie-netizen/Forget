@@ -32,7 +32,7 @@ try {
     'messages/c100/messages.json': json([...messages('100'), { ID: 12345678901234567890, Timestamp: 'bad' }]),
     'messages/c200/channel.json': json({ type: 1, name: 'Bob' }),
     'messages/c200/messages.csv': strToU8('ID,Timestamp,Contents\n2000,2025-01-02T12:00:00Z,"hello,world"\n2001,2025-01-02T12:00:00Z,test'),
-    'messages/c300/channel.json': json({ type: 0, name: 'Salon' }),
+    'messages/c300/channel.json': json({ type: 0, name: 'Channel' }),
     'messages/c300/messages.json': json(messages('300')),
     '../ignored.txt': strToU8('not extracted'),
   }));

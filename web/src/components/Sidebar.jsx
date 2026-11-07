@@ -31,17 +31,17 @@ function NavButton({ id, page, onNavigate, icon, children, right }) {
 export default function Sidebar({ social = [], page, onNavigate, discordState, discordUser, archiveOn, onAddAccount, apiOk }) {
   const connected = discordState === 'connected';
   const discordHint = connected
-    ? 'Connecté'
+    ? "Connected"
     : discordState === 'unavailable'
-      ? 'Module indisponible'
-      : 'Non connecté';
+      ? "Module unavailable"
+      : "Not connected";
   return (
     <aside className="sidebar">
       <div className="logo" aria-label="Forget">
         <span className="logo-mark" aria-hidden="true" />
         FORGET
       </div>
-      <nav aria-label="Navigation principale" className="side-nav">
+      <nav aria-label="Main navigation" className="side-nav">
         <NavButton id="home" page={page} onNavigate={onNavigate} icon="home">Home</NavButton>
 
         <div className="nav-section">SOCIAL MEDIA</div>
@@ -58,7 +58,7 @@ export default function Sidebar({ social = [], page, onNavigate, discordState, d
                   <button type="button" className={`account${page === a.id ? ' active' : ''}`} aria-current={page === a.id ? 'page' : undefined} onClick={() => onNavigate(a.id)}>
                     <span className={`avatar tone-${a.tone}`} aria-hidden="true">{a.letter}</span>
                     <span className="account-name">{a.label}</span>
-                    <span className="account-hint">{a.id === 'tiktok' ? 'reposts' : ['facebook','instagram'].includes(a.id) ? 'assisté' : social.some(s => s.provider === a.id && s.connected) ? 'connecté' : 'à connecter'}</span>
+                    <span className="account-hint">{a.id === 'tiktok' ? 'reposts' : ['facebook','instagram'].includes(a.id) ? "guided" : social.some(s => s.provider === a.id && s.connected) ? "connected" : "not connected"}</span>
                   </button>
                 </li>
               );
@@ -70,12 +70,12 @@ export default function Sidebar({ social = [], page, onNavigate, discordState, d
                   className={`account${page === 'discord' ? ' active' : ''}${on ? '' : ' dim'}`}
                   aria-current={page === 'discord' ? 'page' : undefined}
                   onClick={() => onNavigate('discord')}
-                  title={discordUser?.username ? `${discordHint} : ${discordUser.username}` : discordHint}
+                  title={discordUser?.username ? `${discordHint}: ${discordUser.username}` : discordHint}
                 >
                   <span className={`avatar tone-${a.tone}`} aria-hidden="true">{a.letter}</span>
                   <span className="account-name">{a.label}</span>
                   {on ? (
-                    <span className="account-live"><span className="dot up" aria-hidden="true" />Connecté</span>
+                    <span className="account-live"><span className="dot up" aria-hidden="true" />Connected</span>
                   ) : (
                     <span className="account-hint">{discordHint.toLowerCase()}</span>
                   )}
@@ -88,8 +88,8 @@ export default function Sidebar({ social = [], page, onNavigate, discordState, d
           <Icon name="plus" size={16} /> Add account
         </button>
 
-        <NavButton id="export" page={page} onNavigate={onNavigate} icon="archive">Nettoyage export</NavButton>
-        <NavButton id="schedule" page={page} onNavigate={onNavigate} icon="clock">Planification</NavButton>
+        <NavButton id="export" page={page} onNavigate={onNavigate} icon="archive">Export cleanup</NavButton>
+        <NavButton id="schedule" page={page} onNavigate={onNavigate} icon="clock">Scheduling</NavButton>
         <NavButton id="disappearing" page={page} onNavigate={onNavigate} icon="eye">Disappearing Mode</NavButton>
         <NavButton
           id="archive"
@@ -111,9 +111,9 @@ export default function Sidebar({ social = [], page, onNavigate, discordState, d
         <button type="button" className={`nav-item small${page === 'settings' ? ' active' : ''}`} onClick={() => onNavigate('settings')}>
           <Icon name="settings" size={16} /> <span className="nav-label">Settings</span>
         </button>
-        <button type="button" className="nav-item small" onClick={() => { onNavigate('settings'); // La page Réglages se monte puis charge ses données : on attend que la carte existe.
+        <button type="button" className="nav-item small" onClick={() => { onNavigate('settings'); // Settings mounts before loading its data: wait for the card to appear.
           let n = 0; const go = () => { const el = document.getElementById('mise-a-jour'); if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' }); else if (n++ < 20) setTimeout(go, 50); }; setTimeout(go, 50); }}>
-          <Icon name="refresh" size={16} /> <span className="nav-label">Mettre à jour</span>
+          <Icon name="refresh" size={16} /> <span className="nav-label">Update</span>
         </button>
         <div className="version">
           <span className={`dot ${apiOk === false ? 'down' : apiOk ? 'up' : ''}`} aria-hidden="true" />

@@ -1,11 +1,11 @@
-// Genere assets/icon.ico (256x256, fond rouge #e5484d, lettre R blanche) sans dependance.
+// Generate assets/icon.ico (256x256, red background #e5484d, white letter R) with no dependencies.
 import { deflateSync } from 'node:zlib';
 import { writeFileSync, mkdirSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
 
 const N = 256;
-const R = ['1111.', '1...1', '1...1', '1111.', '1.1..', '1..1.', '1...1']; // glyphe 5x7
+const R = ['1111.', '1...1', '1...1', '1111.', '1.1..', '1..1.', '1...1']; // 5x7 glyph
 
 function crc32(buf) {
   let c, crc = ~0;
@@ -48,7 +48,7 @@ export function makePng() {
 export function makeIco() {
   const png = makePng();
   const head = Buffer.alloc(22);
-  head.writeUInt16LE(1, 2); head.writeUInt16LE(1, 4); // type icone, 1 image
+  head.writeUInt16LE(1, 2); head.writeUInt16LE(1, 4); // icon type, 1 image
   head[6] = 0; head[7] = 0; // 0 = 256 px
   head.writeUInt16LE(1, 10); head.writeUInt16LE(32, 12);
   head.writeUInt32LE(png.length, 14); head.writeUInt32LE(22, 18);

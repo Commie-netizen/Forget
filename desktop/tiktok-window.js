@@ -1,9 +1,9 @@
 'use strict';
-// TikTok n'offre aucune API officielle pour les republications (reposts). Forget ouvre donc tiktok.com dans une
-// fenetre isolee ou l'utilisateur se connecte lui-meme, puis appelle, DANS cette page et avec la session de
-// l'utilisateur, les memes requetes web que le site (liste : /api/repost/item_list/, retrait : /tiktok/v1/upvote/delete).
-// Aucune signature n'est calculee par Forget, aucun mot de passe ni cookie n'est lu. Endpoints non documentes :
-// ils peuvent changer sans preavis (verification faite le 2026-11-07).
+// TikTok offers no official repost API. Forget therefore opens tiktok.com in an
+// isolated window where the user logs in directly, then makes the site's own web requests
+// INSIDE that page using the user's session (list: /api/repost/item_list/, removal: /tiktok/v1/upvote/delete).
+// Forget calculates no signatures and reads no passwords or cookies. These undocumented endpoints
+// may change without notice (verified on 2026-11-07).
 const { BrowserWindow } = require('electron');
 const { isOnline } = require('./social-windows.js');
 
@@ -22,7 +22,7 @@ let win = null;
 function ensureWindow() {
   if (win && !win.isDestroyed()) return win;
   win = new BrowserWindow({
-    width: 1100, height: 820, title: 'Forget - TikTok (votre session)', autoHideMenuBar: true,
+    width: 1100, height: 820, title: 'Forget - TikTok (your session)', autoHideMenuBar: true,
     webPreferences: { partition: 'persist:forget-tiktok', nodeIntegration: false, contextIsolation: true, sandbox: true, webSecurity: true, devTools: false },
   });
   const ses = win.webContents.session;
@@ -38,11 +38,11 @@ function ensureWindow() {
 }
 
 exports.open = async function open() {
-  if (!isOnline()) throw new Error('Mode hors-ligne actif');
+  if (!isOnline()) throw new Error('Offline mode is on');
   const w = ensureWindow();
   w.show(); w.focus();
   const url = w.webContents.getURL();
-  if (!inDomains(url, PAGE_DOMAINS)) await w.loadURL('https://www.tiktok.com/profile').catch(() => { /* redirection de connexion */ });
+  if (!inDomains(url, PAGE_DOMAINS)) await w.loadURL('https://www.tiktok.com/profile').catch(() => { /*login redirect */ });
   return { opened: true };
 };
 
@@ -50,13 +50,13 @@ exports.isOpen = () => !!(win && !win.isDestroyed());
 exports.close = () => { if (win && !win.isDestroyed()) win.close(); };
 
 function run(code) {
-  if (!win || win.isDestroyed()) throw Object.assign(new Error('Ouvrez la fenêtre TikTok et connectez-vous.'), { code: 'NO_WINDOW' });
-  if (!isOnline()) throw Object.assign(new Error('Mode hors-ligne actif'), { code: 'OFFLINE' });
-  if (!inDomains(win.webContents.getURL(), PAGE_DOMAINS)) throw Object.assign(new Error('La fenêtre TikTok a quitté tiktok.com.'), { code: 'NO_WINDOW' });
+  if (!win || win.isDestroyed()) throw Object.assign(new Error('Open the TikTok window and log in.'), { code: 'NO_WINDOW' });
+  if (!isOnline()) throw Object.assign(new Error('Offline mode is on'), { code: 'OFFLINE' });
+  if (!inDomains(win.webContents.getURL(), PAGE_DOMAINS)) throw Object.assign(new Error('The TikTok window left tiktok.com.'), { code: 'NO_WINDOW' });
   return win.webContents.executeJavaScript(code, true);
 }
 
-// Contexte de la page (donnees de rehydratation du site) : compte connecte et jeton CSRF.
+// Page context (site rehydration data): connected account and CSRF token.
 const CONTEXT_JS = `(() => {
   try {
     let data = window.__$UNIVERSAL_DATA$__;
@@ -77,15 +77,15 @@ exports.context = async function context() {
 };
 
 exports.listReposts = async function listReposts({ secUid, cursor = '0', count = 30 }) {
-  if (typeof secUid !== 'string' || !/^[A-Za-z0-9_.-]{10,200}$/.test(secUid)) throw new Error('Compte TikTok non identifié');
+  if (typeof secUid !== 'string' || !/^[A-Za-z0-9_.-]{10,200}$/.test(secUid)) throw new Error('TikTok account not identified');
   const c = String(cursor);
-  if (!/^\d{1,25}$/.test(c)) throw new Error('Curseur invalide');
+  if (!/^\d{1,25}$/.test(c)) throw new Error('Invalid cursor');
   const n = Math.min(30, Math.max(1, Number(count) || 30));
   return run(`(async () => {
     const p = new URLSearchParams({ aid: '1988', count: '${n}', coverFormat: '2', cursor: ${JSON.stringify(c)}, needPinnedItemIds: 'true', post_item_list_request_type: '0', secUid: ${JSON.stringify(secUid)} });
     const r = await fetch('https://www.tiktok.com/api/repost/item_list/?' + p.toString(), { method: 'GET', headers: { accept: '*/*' }, credentials: 'same-origin' });
     const raw = await r.text();
-    let j = null; try { j = JSON.parse(raw); } catch (e) { /* non JSON */ }
+    let j = null; try { j = JSON.parse(raw); } catch (e) { /*non-JSON */ }
     if (!r.ok || !j) return { ok: false, httpStatus: r.status, statusCode: j ? j.status_code : null };
     if (j.status_code !== 0) return { ok: false, httpStatus: r.status, statusCode: j.status_code, message: j.status_msg || '' };
     return { ok: true, hasMore: !!j.hasMore, cursor: j.cursor != null ? String(j.cursor) : null,
@@ -96,7 +96,7 @@ exports.listReposts = async function listReposts({ secUid, cursor = '0', count =
 
 exports.removeRepost = async function removeRepost(itemId) {
   const id = String(itemId);
-  if (!/^\d{1,25}$/.test(id)) throw new Error('Identifiant de vidéo invalide');
+  if (!/^\d{1,25}$/.test(id)) throw new Error('Invalid video ID');
   return run(`(async () => {
     let csrf = '';
     try {
@@ -104,7 +104,7 @@ exports.removeRepost = async function removeRepost(itemId) {
       if (!data || !data.__DEFAULT_SCOPE__) { const el = document.getElementById('__UNIVERSAL_DATA_FOR_REHYDRATION__'); data = el && el.textContent ? JSON.parse(el.textContent) : null; }
       const ctx = data && data.__DEFAULT_SCOPE__ && data.__DEFAULT_SCOPE__['webapp.app-context'];
       csrf = (ctx && ctx.csrfToken) || '';
-    } catch (e) { /* sans jeton CSRF */ }
+    } catch (e) { /* no CSRF token */ }
     const headers = { accept: '*/*', 'content-type': 'application/x-www-form-urlencoded' };
     if (csrf) headers['tt-csrf-token'] = csrf;
     const p = new URLSearchParams({ aid: '1988', item_id: ${JSON.stringify(id)} });
@@ -112,7 +112,7 @@ exports.removeRepost = async function removeRepost(itemId) {
     const raw = await r.text();
     if (!r.ok) return { ok: false, httpStatus: r.status };
     if (!raw.trim()) return { ok: true, httpStatus: r.status };
-    let j = null; try { j = JSON.parse(raw); } catch (e) { return { ok: false, httpStatus: r.status, message: 'Réponse non JSON' }; }
+    let j = null; try { j = JSON.parse(raw); } catch (e) { return { ok: false, httpStatus: r.status, message: 'Non-JSON response' }; }
     return j.status_code === 0 ? { ok: true, httpStatus: r.status } : { ok: false, httpStatus: r.status, statusCode: j.status_code, message: j.status_msg || '' };
   })()`);
 };

@@ -1,9 +1,9 @@
-// Tables SQLite du module Discord + requêtes. Le token ne sort jamais d'ici que vers http.mjs.
+// Discord module SQLite tables and queries. The token only leaves here for http.mjs.
 import { randomUUID } from 'node:crypto';
 import { parseTime } from './util.mjs';
 
 let db = null;
-// Cache des requêtes préparées (une compilation par SQL et par base) : les jobs appellent ces fonctions par message.
+// Prepared statement cache (one compilation per SQL statement per database): jobs call these functions for every message.
 let stmts = new Map();
 const prep = (sql) => {
   let st = stmts.get(sql);
@@ -31,34 +31,34 @@ CREATE INDEX IF NOT EXISTS idx_discordArchive_at ON discordArchive(archivedAt);
 CREATE INDEX IF NOT EXISTS idx_discordJobLog_job ON discordJobLog(jobId);
 `);
   ensurePurgeTable();
-  // Migration : curseur de progression des jobs (méthode historique).
+  // Migration: job progress cursor (history method).
   if (!db.prepare('PRAGMA table_info(discordJob)').all().some((c) => c.name === 'cursor')) db.exec('ALTER TABLE discordJob ADD COLUMN cursor TEXT');
   if (!db.prepare('PRAGMA table_info(discordJob)').all().some((c) => c.name === 'skipped')) db.exec('ALTER TABLE discordJob ADD COLUMN skipped INTEGER DEFAULT 0');
   db.prepare("INSERT OR IGNORE INTO discordDisappearing(id,enabled,delaySec,scope,guildIds,updatedAt) VALUES (1,0,3600,'all','[]',?)").run(Date.now());
 }
 
-// ---- token (l'avatar va dans la table setting : le schéma imposé n'a pas de colonne avatar)
-// Chiffrement : si globalThis.__FORGET_CIPHER ({ encrypt(s)->b64, decrypt(b64)->s }) existe, le token est stocké "enc:v1:<b64>".
+// ---- token (avatar goes in the setting table: the required schema has no avatar column)
+// Encryption: when globalThis.__FORGET_CIPHER ({ encrypt(s)->b64, decrypt(b64)->s }) exists, store the token as "enc:v1:<b64>".
 const ENC_PREFIX = 'enc:v1:';
 const cipher = () => {
   const c = globalThis.__FORGET_CIPHER;
   return c && typeof c.encrypt === 'function' && typeof c.decrypt === 'function' ? c : null;
 };
 export const cipherKind = () => (cipher() ? 'dpapi' : 'plain');
-/** true si le token stocké est chiffré en base. */
+/** true if the stored token is encrypted in the database. */
 export const isTokenEncrypted = () => !!(db && prep('SELECT token FROM discordToken WHERE id=1').get())?.token?.startsWith(ENC_PREFIX);
 
-/** Renvoie { token (clair), userId, username } ou null. Un token en clair est ré-écrit chiffré dès qu'un cipher existe. */
+/** Return { token (plaintext), userId, username } or null. Rewrite a plaintext token as encrypted as soon as a cipher is available. */
 export function getToken() {
   const row = db ? prep('SELECT token,userId,username FROM discordToken WHERE id=1').get() : null;
   if (!row?.token) return null;
   const c = cipher();
   if (row.token.startsWith(ENC_PREFIX)) {
-    if (!c) return null; // chiffré mais aucun cipher disponible : illisible
+    if (!c) return null; // encrypted but no cipher available: unreadable
     try { return { ...row, token: c.decrypt(row.token.slice(ENC_PREFIX.length)) }; } catch { return null; }
   }
   if (c) {
-    try { prep('UPDATE discordToken SET token=? WHERE id=1').run(ENC_PREFIX + c.encrypt(row.token)); } catch { /* reste en clair */ }
+    try { prep('UPDATE discordToken SET token=? WHERE id=1').run(ENC_PREFIX + c.encrypt(row.token)); } catch { /*remains in plaintext */ }
   }
   return row;
 }
@@ -76,7 +76,7 @@ export function clearToken() {
   prep("DELETE FROM setting WHERE key='discord.avatar'").run();
 }
 
-// ---- archive locale
+// ---- local archive
 export function insertArchive(r) {
   const id = randomUUID();
   prep(`INSERT INTO discordArchive(id,kind,platform,guildName,channelId,channelName,messageId,authorId,content,attachments,
@@ -127,7 +127,7 @@ export const listActiveJobs = () =>
   prep("SELECT * FROM discordJob WHERE status IN ('queued','running') ORDER BY createdAt, rowid").all().map(jobOut);
 export const activeJobIds = () => prep("SELECT id FROM discordJob WHERE status IN ('queued','running')").all().map((r) => r.id);
 export function markInterrupted() {
-  prep("UPDATE discordJob SET status='interrupted', finishedAt=?, error='interrompu par arrêt du serveur' WHERE status IN ('queued','running')").run(Date.now());
+  prep("UPDATE discordJob SET status='interrupted', finishedAt=?, error='interrupted by server shutdown' WHERE status IN ('queued','running')").run(Date.now());
 }
 
 export function addLog(jobId, level, message, meta) {
@@ -136,7 +136,7 @@ export function addLog(jobId, level, message, meta) {
 export const getLogs = (jobId) =>
   prep('SELECT * FROM discordJobLog WHERE jobId=? ORDER BY at, rowid').all(jobId).map((r) => ({ ...r, meta: parse(r.meta, null) }));
 
-// ---- mode disparition (configuration persistée)
+// ---- disappearing mode (persisted configuration)
 export function getDisappearing() {
   const r = prep('SELECT * FROM discordDisappearing WHERE id=1').get();
   return { enabled: !!r.enabled, delaySec: r.delaySec, scope: r.scope, guildIds: parse(r.guildIds, []), updatedAt: r.updatedAt };
@@ -148,7 +148,7 @@ export function setDisappearing(patch) {
   return getDisappearing();
 }
 
-// ---- purges reprenables (curseur `before` persisté, traitement par lots)
+// ---- resumable purges (persisted before cursor, batch processing)
 const PURGE_COLS = new Set(['status', 'chunkSize', 'intervalSec', 'speed', 'fromTs', 'toTs', 'cursorBefore', 'processed', 'deleted',
   'failed', 'runs', 'lastRunAt', 'nextRunAt', 'error']);
 

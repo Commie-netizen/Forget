@@ -1,6 +1,6 @@
-// Purges reprenables : suppression de MES messages d'un salon, sans plafond, par lots de `chunkSize`.
-// Mémoire constante : on lit une page de recherche (25), on la traite, on persiste le curseur `before`
-// (plus petit id traité), puis on recommence. Aucun tableau cumulatif des messages.
+// Resumable purges: delete MY messages from a channel, with no cap, in batches of chunkSize.
+// Constant memory: read one search page (25), process it, persist the before cursor
+// (lowest ID processed), then repeat. No accumulated message array.
 import * as store from './store.mjs';
 import { discordFetch } from './http.mjs';
 import { searchPage } from './search.mjs';
@@ -12,7 +12,7 @@ export const DEFAULT_CHUNK = 5000;
 export const DEFAULT_INTERVAL_SEC = 3600;
 export const SCHEDULER_MS = 10_000;
 
-const running = new Map(); // purgeId -> Promise (une seule exécution à la fois par purge)
+const running = new Map(); // purgeId -> Promise (one execution at a time per purge)
 let timer = null;
 let stopping = false;
 
@@ -24,7 +24,7 @@ export function startPurge(b) {
     guildName: b.guildName, channelName: b.channelName,
     chunkSize: Number.isFinite(chunk) && chunk >= 1 ? Math.floor(chunk) : DEFAULT_CHUNK,
     intervalSec: Number.isFinite(intv) && intv >= 1 ? Math.floor(intv) : DEFAULT_INTERVAL_SEC,
-    // L'interface envoie le nom du préréglage (« safe », « fast ») : accepté comme { mode }.
+    // The UI sends the preset name ("safe", "fast"): accepted as { mode }.
     speed: resolveSpeed(typeof b.speed === 'string' ? { mode: b.speed } : (b.speed ?? { mode: 'safe' })),
     fromTs: parseTime(b.from), toTs: parseTime(b.to),
   });
@@ -32,7 +32,7 @@ export function startPurge(b) {
   return id;
 }
 
-/** Lance une exécution (différée d'un tick pour laisser la requête HTTP répondre). */
+/** Start an execution (deferred one tick to let the HTTP request return). */
 function triggerPurge(id, deferred = false) {
   if (running.has(id)) return running.get(id);
   const start = deferred ? new Promise((r) => setImmediate(r)) : Promise.resolve();
@@ -41,10 +41,10 @@ function triggerPurge(id, deferred = false) {
   return p;
 }
 
-/** Force une exécution immédiate. Réactive une purge en erreur ; refuse done/cancelled. */
+/** Force immediate execution. Reactivate a failed purge; reject done/cancelled. */
 export function runPurgeNow(id) {
   const p = store.getPurge(id);
-  if (!p) return { error: 'purge introuvable', status: 404 };
+  if (!p) return { error: 'purge not found', status: 404 };
   if (p.status === 'done' || p.status === 'cancelled') return { error: `purge ${p.status}`, status: 409 };
   if (p.status === 'error') store.updatePurge(id, { status: 'active', error: null });
   triggerPurge(id, true);
@@ -61,7 +61,7 @@ export function cancelPurge(id) {
 export const waitForPurge = (id) => running.get(id) ?? Promise.resolve();
 export const waitAllPurges = () => Promise.all([...running.values()]);
 
-/** Déclenche les purges actives dont nextRunAt est échu (exporté pour les tests). */
+/** Trigger active purges whose nextRunAt is due (exported for tests). */
 export function tickPurges(at = Date.now()) {
   if (!store.getToken()) return [];
   const due = store.duePurges(at).filter((id) => !running.has(id));
@@ -72,11 +72,11 @@ export function tickPurges(at = Date.now()) {
 export function startPurgeScheduler(ms = SCHEDULER_MS) {
   if (timer) return;
   stopping = false;
-  timer = setInterval(() => { try { tickPurges(); } catch { /* base fermée */ } }, ms);
+  timer = setInterval(() => { try { tickPurges(); } catch { /*database closed */ } }, ms);
   timer.unref?.();
 }
 export function stopPurgeScheduler() {
-  stopping = true; // les exécutions en cours s'arrêtent après la page courante, curseur sauvegardé
+  stopping = true; // running executions stop after the current page, with the cursor saved
   if (timer) { clearInterval(timer); timer = null; }
 }
 
@@ -86,7 +86,7 @@ async function runPurge(id) {
   let purge = store.getPurge(id);
   if (!purge || purge.status !== 'active') return;
   const token = store.getToken();
-  if (!token) return; // reste active : repris dès qu'un token existe
+  if (!token) return; // remain active: resume once a token is available
   const me = token.userId;
   const speed = purge.speed ?? resolveSpeed();
   const pace = makePacer(speed.delayMs);
@@ -94,7 +94,7 @@ async function runPurge(id) {
   const minId = purge.fromTs ? msToSnowflake(purge.fromTs) : undefined;
   const baseMax = purge.toTs ? msToSnowflake(purge.toTs) : undefined;
   const meta = { channelName: purge.channelName, guildName: purge.guildName };
-  let cursor = purge.cursorBefore; // plus petit id déjà traité
+  let cursor = purge.cursorBefore; // lowest ID already processed
   let doneInRun = 0;
   let exhausted = false;
   let bulkOk = true;
@@ -114,21 +114,21 @@ async function runPurge(id) {
       acc.deleted++;
     } catch (e) {
       if (e.status === 401) throw e;
-      if (e.status === 404) acc.deleted++; // déjà supprimé
+      if (e.status === 404) acc.deleted++; // already deleted
       else acc.failed++;
     }
   };
 
   try {
     while (isLive(id) && doneInRun < purge.chunkSize) {
-      // maxId = curseur (inclusif côté Discord possible) : on filtre ensuite id < curseur
+      // maxId = cursor (Discord may treat it as inclusive): then filter id < cursor
       const maxId = cursor ?? baseMax;
       const page = await searchPage(token.token, {
         guildId: purge.guildId ?? undefined, channelId: purge.channelId, authorId: me, minId, maxId, offset: 0,
       }, { pace });
       let msgs = page.messages.filter((m) => m.authorId === me && (cursor === null || cmpId(m.id, cursor) < 0));
       if (!msgs.length) { exhausted = true; break; }
-      msgs.sort((a, b) => cmpId(b.id, a.id)); // récent -> ancien
+      msgs.sort((a, b) => cmpId(b.id, a.id)); // newest -> oldest
       msgs = msgs.slice(0, purge.chunkSize - doneInRun);
 
       const recent = bulkOk ? msgs.filter((m) => m.timestamp > cutoff) : [];
@@ -141,13 +141,13 @@ async function runPurge(id) {
           acc.deleted += recent.length;
         } catch (e) {
           if (e.status === 401) throw e;
-          if ([400, 403, 404, 405].includes(e.status)) { bulkOk = false; singles.push(...recent); } // repli unitaire
+          if ([400, 403, 404, 405].includes(e.status)) { bulkOk = false; singles.push(...recent); } // fall back to individual deletion
           else acc.failed += recent.length;
         }
       } else singles.push(...recent);
       let interrupted = false;
       for (const m of singles) {
-        if (!isLive(id)) { interrupted = true; break; } // annulation/arrêt : curseur non avancé, la page sera revue
+        if (!isLive(id)) { interrupted = true; break; } // cancellation/shutdown: cursor not advanced, page will be revisited
         await delSingle(m);
       }
       if (interrupted) { flush(); break; }

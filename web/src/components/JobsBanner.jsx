@@ -4,7 +4,7 @@ import { nf } from '../lib.js';
 
 const BANNER_POLL_MS = 2000;
 
-// Bannière globale (rendue par le shell) : lecture seule, n'annule jamais aucun job.
+// Global banner (rendered by the shell): read-only, never cancels jobs.
 export default function JobsBanner({ onView }) {
   const [jobs, setJobs] = useState([]);
 
@@ -12,7 +12,7 @@ export default function JobsBanner({ onView }) {
     let alive = true;
     let timer = null;
     async function tick() {
-      if (document.visibilityState === 'hidden') { timer = setTimeout(tick, BANNER_POLL_MS); return; } // fenêtre masquée : pas de requête
+      if (document.visibilityState === 'hidden') { timer = setTimeout(tick, BANNER_POLL_MS); return; } // hidden window: skip requests
       try {
         const [d, x, reddit, tiktok] = await Promise.all([
           api.discordActiveJobs(),
@@ -27,7 +27,7 @@ export default function JobsBanner({ onView }) {
       } catch (e) {
         if (!alive) return;
         setJobs([]);
-        if (api.isMissingEndpoint(e)) return; // endpoint absent : on cesse d'interroger
+        if (api.isMissingEndpoint(e)) return; // missing endpoint: stop polling
       }
       timer = setTimeout(tick, BANNER_POLL_MS);
     }
@@ -45,11 +45,11 @@ export default function JobsBanner({ onView }) {
     <div className="jobs-banner" role="status" aria-live="polite">
       <span className="jobs-dot" aria-hidden="true" />
       <span className="grow">
-        <strong>{nf(jobs.length)} opération{jobs.length > 1 ? 's' : ''} en cours</strong>
-        {' — '}
+        <strong>{nf(jobs.length)} operation{jobs.length > 1 ? 's' : ''} running</strong>
+        {" · "}
         {nf(done)} / {total ? nf(total) : '?'}
       </span>
-      <button type="button" className="btn sm" onClick={() => onView(jobs[0]?.provider || 'discord')}>Voir</button>
+      <button type="button" className="btn sm" onClick={() => onView(jobs[0]?.provider || 'discord')}>View</button>
     </div>
   );
 }

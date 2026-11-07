@@ -1,6 +1,6 @@
-// Cellule CSV sûre : guillemets RFC 4180 + neutralisation des formules (injection CSV / OWASP).
-// Un texte commençant par = + - @ tabulation ou retour chariot est préfixé d'une apostrophe, sinon un tableur
-// pourrait l'exécuter comme formule (ex. nom de serveur Discord choisi par un tiers, puis exporté).
+// Safe CSV cells: RFC 4180 quoting and formula neutralization (CSV injection / OWASP).
+// Text starting with = + - @, a tab, or a carriage return is prefixed with an apostrophe; otherwise a spreadsheet
+// could execute it as a formula (for example, a Discord server name chosen by a third party and then exported).
 const FORMULA = /^[=+\-@\t\r]/;
 
 export function csvCell(v, separators = /[",\r\n;]/) {

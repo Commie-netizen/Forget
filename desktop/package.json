@@ -2,7 +2,7 @@
   "name": "forget-desktop",
   "productName": "Forget",
   "version": "4.3.0",
-  "description": "Forget - application de bureau (Electron)",
+  "description": "Forget - desktop app (Electron)",
   "private": true,
   "main": "main.js",
   "author": "Forget",

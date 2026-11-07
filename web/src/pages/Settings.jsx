@@ -13,19 +13,19 @@ const truthy = (v) => v === true || v === 'true' || v === 1 || v === '1';
 function TokenSecurityRow() {
   const sec = useLoad(() => api.security());
   const d = sec.data;
-  let label = 'Vérification...';
+  let label = "Verifying...";
   let tone = 'muted';
   if (d) {
     const on = d.tokenEncrypted === true || d.cipher === 'dpapi';
-    label = on ? 'DPAPI Windows (actif)' : 'absent';
+    label = on ? "Windows DPAPI (active)" : "missing";
     tone = on ? 'c-green' : 'c-orange';
   } else if (sec.error || !sec.loading) {
-    label = 'absent';
+    label = "missing";
     tone = 'c-orange';
   }
   return (
     <div className="row">
-      <span className="grow">Chiffrement du token</span>
+      <span className="grow">Token encryption</span>
       <strong className={tone}>{label}</strong>
     </div>
   );
@@ -62,26 +62,26 @@ function PrivacySection() {
   }
 
   return (
-    <Card title="Confidentialité" subtitle="Verrou réseau et mode hors-ligne.">
+    <Card title="Privacy" subtitle="Network lock and offline mode.">
       <div className="stack">
-        <Notice tone="ok">Application 100 % locale — Forget ne communique avec aucun serveur tiers, aucune télémétrie</Notice>
-        {unavailable && <Notice tone="warn">Réglages de confidentialité indisponibles (API injoignable). Le mode hors-ligne reste actif côté serveur par défaut.</Notice>}
+        <Notice tone="ok">100% local app. Forget does not contact third-party servers or collect telemetry</Notice>
+        {unavailable && <Notice tone="warn">Privacy settings unavailable (API unreachable). Offline mode remains active on the server by default.</Notice>}
         <Notice tone="error">{err}</Notice>
         <TokenSecurityRow />
         <div className="row">
-          <span className="grow">Mode hors-ligne</span>
+          <span className="grow">Offline mode</span>
           <Toggle
             checked={p ? p.offline !== false : true}
             onChange={() => p && !busy && setOffline(p.offline === false)}
-            label="Mode hors-ligne"
+            label="Offline mode"
           />
         </div>
         <p className="muted small">
-          ON : aucune connexion sortante. OFF : les API Discord, X et Reddit sont autorisées, et GitHub uniquement quand vous cliquez sur « Rechercher une mise à jour ». Les fenêtres Facebook, Instagram, TikTok et de connexion OAuth s’ouvrent sur votre demande et restent limitées au domaine du service.
+          ON: no outgoing connections. OFF: Discord, X, and Reddit APIs are allowed, and GitHub only when you click "Check for updates". Facebook, Instagram, TikTok, and OAuth login windows open on request and stay restricted to the service’s domain.
         </p>
         {p && p.offline === false && (
           <div>
-            <p className="small">Domaines autorisés :</p>
+            <p className="small">Allowed domains:</p>
             <ul className="small">
               {(p.allowed || []).map((h) => <li key={h}><code>{h}</code></li>)}
             </ul>
@@ -90,10 +90,10 @@ function PrivacySection() {
         {p && (
           <div className="row">
             <span className="grow">
-              Requêtes bloquées : <strong>{p.stats?.blocked ?? 0}</strong>
-              {p.stats?.lastBlockedHost ? <span className="muted small"> (dernière : {p.stats.lastBlockedHost})</span> : null}
+              Blocked requests: <strong>{p.stats?.blocked ?? 0}</strong>
+              {p.stats?.lastBlockedHost ? <span className="muted small"> (last: {p.stats.lastBlockedHost})</span> : null}
             </span>
-            <button type="button" className="btn" onClick={resetStats}>Réinitialiser</button>
+            <button type="button" className="btn" onClick={resetStats}>Reset</button>
           </div>
         )}
       </div>
@@ -119,42 +119,42 @@ export default function Settings() {
 
   return (
     <>
-      <PageHeader title="Settings" subtitle="Apparence, données et informations." />
+      <PageHeader title="Settings" subtitle="Appearance, data, and information." />
       <PrivacySection />
       <Notice tone="error">{error || settings.error}</Notice>
-      <Notice tone="warn" title="Avertissement : conditions d’utilisation de Discord">
-        Automatiser un compte utilisateur (« self-bot ») est contraire aux conditions d’utilisation de Discord et peut entraîner la suspension du compte. Utilisez cette application uniquement sur votre propre compte, à vos risques.
+      <Notice tone="warn" title="Warning: Discord terms of service">
+        Automating a user account (self-bot) violates Discord’s terms of service and may result in account suspension. Use this app only on your own account, at your own risk.
       </Notice>
 
       <div className="cols">
-        <Card title="Apparence et application">
+        <Card title="Appearance and app">
           <div className="stack">
             <Select
-              label="Thème"
+              label="Theme"
               value={theme}
               onChange={setTheme}
-              options={[{ value: 'dark', label: 'Sombre' }, { value: 'light', label: 'Clair' }]}
+              options={[{ value: 'dark', label: "Dark" }, { value: 'light', label: "Light" }]}
             />
             <div className="row">
-              <span className="grow">Démarrer en mode minimisé</span>
-              <Toggle checked={truthy(s.startMinimized)} onChange={() => toggle('startMinimized')} label="Démarrer en mode minimisé" />
+              <span className="grow">Start minimized</span>
+              <Toggle checked={truthy(s.startMinimized)} onChange={() => toggle('startMinimized')} label="Start minimized" />
             </div>
             <div className="row">
-              <span className="grow">Activer les notifications</span>
-              <Toggle checked={truthy(s.notifications)} onChange={() => toggle('notifications')} label="Activer les notifications" />
+              <span className="grow">Enable notifications</span>
+              <Toggle checked={truthy(s.notifications)} onChange={() => toggle('notifications')} label="Enable notifications" />
             </div>
             <div className="row">
               <span className="grow">Local Archive</span>
-              <Toggle checked={localArchive} onChange={setLocalArchive} label="Activer Local Archive" />
+              <Toggle checked={localArchive} onChange={setLocalArchive} label="Enable Local Archive" />
             </div>
             <div>
-              <button type="button" className="btn" onClick={() => navigate('profiles')}>Gérer les profils</button>
+              <button type="button" className="btn" onClick={() => navigate('profiles')}>Manage profiles</button>
             </div>
           </div>
         </Card>
 
         <div className="stack">
-          <Card title="Export des données">
+          <Card title="Data export">
             <div className="actions">
               {['csv', 'json', 'zip'].map((f) => (
                 <a key={f} className="btn" href={api.exportUrl(f)} download>
@@ -162,22 +162,22 @@ export default function Settings() {
                 </a>
               ))}
             </div>
-            <p className="muted small">Export des profils, scans et archives du moteur principal.</p>
+            <p className="muted small">Export profiles, scans, and archives from the main engine.</p>
           </Card>
           <UpdateCard />
-          <Card title="À propos">
+          <Card title="About">
             <dl className="kv">
               <dt>Interface</dt>
               <dd>{APP_VERSION}</dd>
-              <dt>Serveur</dt>
-              <dd>{health?.version || 'inconnue'}</dd>
+              <dt>Server</dt>
+              <dd>{health?.version || "unknown"}</dd>
               <dt>Mode</dt>
-              <dd>{health?.mode === 'demo' ? 'Démo (adaptateurs simulés)' : health?.mode || '-'}</dd>
+              <dd>{health?.mode === 'demo' ? "Demo (simulated adapters)" : health?.mode || '-'}</dd>
               <dt>API</dt>
-              <dd>{apiOk === false ? 'Indisponible' : apiOk ? 'Connectée' : 'Vérification...'}</dd>
+              <dd>{apiOk === false ? "Unavailable" : apiOk ? "Connected" : "Verifying..."}</dd>
               <dt>Discord</dt>
               <dd>
-                {{ connected: 'Connecté', disconnected: 'Non connecté', unavailable: 'Module indisponible', apidown: 'API indisponible', loading: 'Vérification...' }[discord.state] || 'Erreur'}
+                {{ connected: "Connected", disconnected: "Not connected", unavailable: "Module unavailable", apidown: "API unavailable", loading: "Verifying..." }[discord.state] || "Error"}
               </dd>
             </dl>
           </Card>

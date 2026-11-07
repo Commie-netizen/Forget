@@ -1,54 +1,50 @@
-# Politique de sécurité
+# Security policy
 
-## Signaler une vulnérabilité
+## Report a vulnerability
 
-Ne publiez **pas** de faille dans une issue publique. Utilisez les avis de sécurité privés du dépôt (onglet Security, « Report a vulnerability »). Indiquez : version, étapes de reproduction, impact. Réponse visée sous 7 jours.
+Do **not** publish vulnerabilities in public issues. Use the repository's private security advisories (Security tab, "Report a vulnerability"). Include the version, reproduction steps, and impact. We aim to respond within 7 days.
 
-Versions supportées : la dernière version publiée.
+Supported versions: the latest published release.
 
-## Modèle de menace
+## Threat model
 
-Forget est une application Windows locale (Electron + serveur Node lié à `127.0.0.1` + SQLite).
+Forget is a local Windows app (Electron + Node server bound to `127.0.0.1` + SQLite).
 
-Protégé :
+Protections:
 
-- Aucune sortie réseau en mode hors-ligne (défaut). Hors-ligne désactivé : uniquement `discord.com`, `gateway.discord.gg`, `cdn.discordapp.com`, `media.discordapp.net`.
-- Le serveur n'écoute que sur la boucle locale ; la fenêtre ne charge que l'URL locale ; navigation externe, `window.open` et permissions sont refusés.
-- Le token n'est jamais renvoyé en clair par l'API (masqué) et n'est envoyé qu'à Discord. Il est chiffré au repos via DPAPI Windows (Electron `safeStorage`) lorsque disponible.
+- No outbound network traffic in offline mode (default). With offline mode disabled: only `discord.com`, `gateway.discord.gg`, `cdn.discordapp.com`, `media.discordapp.net`.
+- The server listens only on loopback; the window loads only the local URL; external navigation, `window.open`, and permissions are denied.
+- The token is never returned in plain text by the API (it is masked) and is sent only to Discord. It is encrypted at rest using Windows DPAPI (Electron `safeStorage`) when available.
 
-Limites connues :
+Known limitations:
 
-- Un attaquant ayant déjà accès à votre session Windows peut déchiffrer le token DPAPI.
-- L'archive locale des messages est stockée **en clair** dans la base SQLite.
-- Un malware local s'exécutant avec les droits de l'utilisateur n'est pas couvert.
-- L'usage d'un token utilisateur (self-bot) enfreint les CGU de Discord ; ce risque est assumé par l'utilisateur.
+- An attacker who already has access to your Windows session can decrypt the DPAPI token.
+- The local message archive is stored **in plain text** in the SQLite database.
+- Local malware running with the user's permissions is outside the scope of this model.
+- Using a user token (self-bot) violates Discord's terms of service; the user accepts this risk.
 
-## Protections du serveur local
+## Local server protections
 
-L'interface parle à un serveur qui écoute uniquement sur `127.0.0.1`. Une page web ouverte dans un navigateur peut
-envoyer des requêtes vers cette adresse ; Forget les refuse :
+The interface communicates with a server that listens only on `127.0.0.1`. A web page open in a browser can
+send requests to this address; Forget rejects them:
 
-- **DNS rebinding** : l'en-tête `Host` doit désigner une adresse de bouclage (`127.0.0.1`, `localhost`, `[::1]`).
-- **CSRF** : une requête portant un `Origin` doit venir de la même origine ; `Sec-Fetch-Site` doit valoir
-  `same-origin` ou `none` ; toute écriture exige l'en-tête `X-Forget-Request`. Aucun en-tête CORS n'est émis.
-- **En-têtes** : CSP stricte (`script-src 'self'`, `frame-ancestors 'none'`), `nosniff`, `no-referrer`, `DENY`.
-- **Fichiers importés** : archives ZIP lues par le répertoire central, entrées décompressées une à une avec plafonds
-  (64 Mo par fichier, 2 Go au total) ; aucun chemin de l'archive n'est écrit sur disque.
-- **Exports CSV** : les cellules commençant par `= + - @` sont neutralisées (injection de formules).
+- **DNS rebinding**: the `Host` header must specify a loopback address (`127.0.0.1`, `localhost`, `[::1]`).
+- **CSRF**: a request with an `Origin` must come from the same origin; `Sec-Fetch-Site` must be
+  `same-origin` or `none`; all writes require the `X-Forget-Request` header. No CORS headers are sent.
+- **Headers**: strict CSP (`script-src 'self'`, `frame-ancestors 'none'`), `nosniff`, `no-referrer`, `DENY`.
+- **Imported files**: ZIP archives read through the central directory, entries decompressed one at a time with limits
+  (64 MB per file, 2 GB total); no archive path is written to disk.
+- **CSV exports**: cells beginning with `= + - @` are neutralized (formula injection).
 
-Un programme malveillant déjà exécuté sous votre compte Windows reste hors de ce modèle : il peut lire la base locale.
+Malicious software already running under your Windows account remains outside this model: it can read the local database.
 
-## Durcissement de l'exécutable
+## Executable hardening
 
-Fuses Electron : pas de mode `RunAsNode`, `NODE_OPTIONS` et `--inspect` ignorés, application chargée uniquement depuis
-`app.asar` avec contrôle d'intégrité, cookies chiffrés. Fenêtres : `contextIsolation`, `sandbox`, pas de `nodeIntegration`,
-navigation et `window.open` bloqués hors du domaine prévu, permissions refusées. La session web Discord de la fenêtre de
-connexion est effacée dès que le token a été récupéré.
+Electron fuses: no `RunAsNode` mode, `NODE_OPTIONS` and `--inspect` ignored, app loaded only from
+`app.asar` with integrity checking, encrypted cookies. Windows: `contextIsolation`, `sandbox`, no `nodeIntegration`,
+navigation and `window.open` blocked outside the intended domain, permissions denied. The Discord web session in the
+login window is cleared as soon as the token has been retrieved.
 
-## Ce qui n'est jamais collecté
+## What is never collected
 
-Aucune télémétrie, aucun rapport de crash, aucune vérification de mise à jour en arrière-plan (GitHub n'est contacté que sur clic du bouton « Mettre à jour », et le SHA-256 de l'exécutable portable téléchargé est vérifié avec `SHA256SUMS.txt` avant de remplacer le fichier courant à la fermeture et de relancer Forget), aucun compte, aucun service tiers. Le token n'est jamais extrait automatiquement d'une autre application : il est saisi par l'utilisateur ou obtenu via une fenêtre de connexion intégrée explicitement consentie.
-
-## Security policy (English)
-
-Report vulnerabilities privately through GitHub security advisories, not public issues. Forget is fully local, offline by default, collects no telemetry, and never extracts tokens from other applications. The local message archive is stored unencrypted in SQLite.
+No telemetry, no crash reports, no background update checks (GitHub is contacted only when you click "Update", and the downloaded portable executable's SHA-256 is verified against `SHA256SUMS.txt` before replacing the current file on exit and restarting Forget), no accounts, no third-party services. The token is never automatically extracted from another app: it is entered by the user or obtained through an integrated login window with explicit consent.

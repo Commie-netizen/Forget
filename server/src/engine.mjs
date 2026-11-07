@@ -1,5 +1,5 @@
-// Moteurs asynchrones en mémoire (mode démo) : scan, removal, archive axe, scheduler.
-// Aucun appel réseau : tout est simulé et déterministe quand c'est possible.
+// Asynchronous in-memory engines (demo mode): scan, removal, axe archive, scheduler.
+// No network calls: everything is simulated and deterministic where possible.
 import { createHash } from 'node:crypto';
 import * as repo from './repo.mjs';
 
@@ -7,7 +7,7 @@ export class EngineError extends Error {
   constructor(status, message) { super(message); this.status = status; }
 }
 
-// ---- Timers suivis pour pouvoir tout arrêter proprement ----
+// ---- Track timers for clean shutdown ----
 const timers = new Set();
 function later(ms, fn) {
   const t = setTimeout(() => {
@@ -18,10 +18,10 @@ function later(ms, fn) {
   return t;
 }
 
-// Durées (ms) : surchargeables pour les tests.
+// Durations (ms): can be overridden in tests.
 export const timing = { scanStart: 100, scanTotal: 1800, removalStep: 800, axeStart: 100, axeTotal: 1200 };
 
-// ---- PRNG déterministe ----
+// ---- Deterministic PRNG ----
 const seedFrom = (s) => createHash('sha256').update(s).digest().readUInt32BE(0);
 function mulberry32(a) {
   return () => {
@@ -34,15 +34,15 @@ function mulberry32(a) {
 const pick = (rnd, arr) => arr[Math.floor(rnd() * arr.length)];
 const slug = (s) => s.toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
 
-const FIRST = ['Alex', 'Camille', 'Julien', 'Sarah', 'Thomas', 'Léa', 'Nicolas', 'Emma', 'Hugo', 'Chloé'];
-const LAST = ['Martin', 'Bernard', 'Dubois', 'Moreau', 'Laurent', 'Simon', 'Michel', 'Garcia', 'Roux', 'Fontaine'];
-const STREETS = ['rue de la Paix', 'avenue Victor Hugo', 'boulevard Voltaire', 'rue des Lilas', 'chemin du Moulin', 'place du Marché'];
-const CITIES = ['Paris', 'Lyon', 'Marseille', 'Toulouse', 'Nantes', 'Lille', 'Bordeaux'];
+const FIRST = ['Alex', 'Jordan', 'Taylor', 'Sarah', 'Thomas', 'Morgan', 'Nicolas', 'Emma', 'Hugo', 'Chloe'];
+const LAST = ['Martin', 'Bennett', 'Carter', 'Morgan', 'Lawson', 'Simon', 'Mitchell', 'Garcia', 'Reed', 'Fontaine'];
+const STREETS = ['Peace Street', 'Maple Avenue', 'Oak Boulevard', 'Lilac Lane', 'Mill Road', 'Market Square'];
+const CITIES = ['Springfield', 'Riverside', 'Fairview', 'Madison', 'Georgetown', 'Clinton', 'Salem'];
 const PNG_1X1 = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNkYPhfDwAChwGA60e6kgAAAABJRU5ErkJggg==';
 
-// ---- Cron simplifié -> intervalle en ms (null si invalide) ----
-// Formats : "@every 10s|5m|2h", "@hourly", "@daily", "@weekly", "*/N * * * *" (toutes les N minutes).
-// Toute autre expression à 5 champs est traitée comme quotidienne (démo : pas de vrai calendrier cron).
+// ---- Simplified cron -> interval in ms (null if invalid) ----
+// Formats: "@every 10s|5m|2h", "@hourly", "@daily", "@weekly", "*/N * * * *" (every N minutes).
+// Any other five-field expression is treated as daily (demo: no real cron calendar).
 export function cronIntervalMs(cron) {
   const c = String(cron ?? '').trim();
   let m;
@@ -61,7 +61,7 @@ export function cronIntervalMs(cron) {
 // ---- Scan ----
 function generateResults(profile, claw, jobId) {
   const rnd = mulberry32(seedFrom(profile.id + claw.id));
-  const count = 2 + Math.floor(rnd() * 4); // 2 à 5
+  const count = 2 + Math.floor(rnd() * 4); // 2 to 5
   const baseYear = profile.dateOfBirth ? new Date(profile.dateOfBirth).getFullYear() : NaN;
   const out = [];
   for (let i = 0; i < count; i++) {
@@ -87,20 +87,20 @@ function generateResults(profile, claw, jobId) {
 
 export function startScan(profileId, clawId, trigger = 'manual') {
   const profile = repo.getProfile(profileId);
-  if (!profile) throw new EngineError(404, 'profil introuvable');
+  if (!profile) throw new EngineError(404, 'profile not found');
   const claw = repo.getClaw(clawId);
-  if (!claw) throw new EngineError(404, 'claw introuvable');
-  if (repo.findActiveScan(profileId, clawId)) throw new EngineError(409, 'un scan est déjà actif pour ce profil et ce broker');
+  if (!claw) throw new EngineError(404, 'claw not found');
+  if (repo.findActiveScan(profileId, clawId)) throw new EngineError(409, 'a scan is already active for this profile and broker');
   const job = repo.createScanJob(profileId, clawId, trigger);
   repo.addEvent('scan.queued', { scanJobId: job.id, profileId, clawId });
 
   later(timing.scanStart, () => repo.updateScanJob(job.id, { status: 'running', startedAt: Date.now() }));
   later(timing.scanTotal, () => {
-    if (!repo.getProfile(profileId)) return; // profil supprimé entre-temps
+    if (!repo.getProfile(profileId)) return; // profile deleted in the meantime
     let n = 0;
     for (const data of generateResults(profile, claw, job.id)) {
       const res = repo.createScanResult(job.id, data);
-      repo.createScreenshot(res.id, { kind: 'page', label: `${claw.name} - fiche trouvée`, data: PNG_1X1 });
+      repo.createScreenshot(res.id, { kind: 'page', label: `${claw.name} - listing found`, data: PNG_1X1 });
       n++;
     }
     repo.updateScanJob(job.id, { status: 'succeeded', completedAt: Date.now() });
@@ -111,18 +111,18 @@ export function startScan(profileId, clawId, trigger = 'manual') {
 
 // ---- Removal ----
 const STEP_DEFS = [
-  ['Soumission du formulaire d\'opt-out', 'submit'],
-  ['Vérification de la demande', 'verify'],
-  ['Attente de la confirmation du broker', 'poll'],
-  ['Suppression confirmée', 'done'],
+  ['Opt-out form submitted', 'submit'],
+  ['Request verified', 'verify'],
+  ['Waiting for broker confirmation', 'poll'],
+  ['Removal confirmed', 'done'],
 ];
 
 export function startRemoval(scanResultId, trigger = 'manual') {
   const result = repo.getScanResult(scanResultId);
-  if (!result) throw new EngineError(404, 'résultat de scan introuvable');
+  if (!result) throw new EngineError(404, 'scan result not found');
   const scan = repo.getScanJob(result.scanJobId);
-  if (!scan) throw new EngineError(404, 'scan associé introuvable');
-  if (repo.findActiveRemoval(scanResultId)) throw new EngineError(409, 'une suppression est déjà en cours pour ce résultat');
+  if (!scan) throw new EngineError(404, 'related scan not found');
+  if (repo.findActiveRemoval(scanResultId)) throw new EngineError(409, 'a removal is already in progress for this result');
 
   const job = repo.createRemovalJob({ clawId: scan.clawId, profileId: scan.profileId, scanResultId, trigger });
   const stepIds = STEP_DEFS.map(([name, type]) => repo.createRemovalStep(job.id, name, type));
@@ -137,7 +137,7 @@ export function startRemoval(scanResultId, trigger = 'manual') {
     later(dt * (i + 1), () => {
       const t = Date.now();
       const [, type] = STEP_DEFS[i];
-      repo.updateRemovalStep(stepId, { status: 'ok', type, at: t, demo: true, detail: `étape ${type} simulée` });
+      repo.updateRemovalStep(stepId, { status: 'ok', type, at: t, demo: true, detail: `simulated ${type} step` });
       if (i < STEP_DEFS.length - 1) {
         repo.updateRemovalJob(job.id, { nextPollAt: t + dt });
       } else {
@@ -149,31 +149,31 @@ export function startRemoval(scanResultId, trigger = 'manual') {
   return job;
 }
 
-// ---- Axes (réseaux sociaux) ----
+// ---- Axes (social networks) ----
 const THING_TEXTS = {
-  default: ['Merci pour le retour !', 'Je ne suis pas d\'accord avec ce point.', 'Voici le lien dont je parlais.', 'On se voit demain ?', 'Super idée, je participe.', 'Petite question sur la configuration.', 'Résolu, merci à tous.', 'À relire avant publication.'],
+  default: ['Thanks for the feedback!', 'I disagree with that point.', 'Here is the link I mentioned.', 'See you tomorrow?', 'Great idea, count me in.', 'Quick question about the setup.', 'Solved, thanks everyone.', 'Proofread before publishing.'],
 };
-const CHANNELS = ['general', 'random', 'projets', 'support', 'perso'];
-const SERVERS = ['Maison', 'Travail', 'Amis', 'Communauté'];
+const CHANNELS = ['general', 'random', 'projects', 'support', 'personal'];
+const SERVERS = ['Home', 'Work', 'Friends', 'Community'];
 
 export function connectAxe(axeId, displayName) {
-  if (!repo.getAxe(axeId)) throw new EngineError(404, 'axe introuvable');
+  if (!repo.getAxe(axeId)) throw new EngineError(404, 'axe not found');
   const acc = repo.createAxeAccount(axeId, displayName);
   repo.addEvent('axe.connected', { axeId, accountId: acc.id, displayName });
   return acc;
 }
 
 export function startArchive(axeId, accountId) {
-  if (!repo.getAxe(axeId)) throw new EngineError(404, 'axe introuvable');
+  if (!repo.getAxe(axeId)) throw new EngineError(404, 'axe not found');
   const acc = repo.getAxeAccount(accountId);
-  if (!acc || acc.axeId !== axeId) throw new EngineError(404, 'compte introuvable pour cet axe');
-  if (repo.findActiveAxeJob(accountId)) throw new EngineError(409, 'une archive est déjà en cours pour ce compte');
+  if (!acc || acc.axeId !== axeId) throw new EngineError(404, 'account not found for this axe');
+  if (repo.findActiveAxeJob(accountId)) throw new EngineError(409, 'an archive is already in progress for this account');
   const job = repo.createAxeJob(axeId, accountId, 'archive');
   repo.addEvent('axe.queued', { axeJobId: job.id, axeId, accountId });
 
   later(timing.axeStart, () => repo.updateAxeJob(job.id, { status: 'running', startedAt: Date.now() }));
   later(timing.axeTotal, () => {
-    const total = 5 + Math.floor(Math.random() * 16); // 5 à 20
+    const total = 5 + Math.floor(Math.random() * 16); // 5 to 20
     const t = Date.now();
     for (let i = 0; i < total; i++) {
       repo.createThing({
@@ -190,7 +190,7 @@ export function startArchive(axeId, accountId) {
 }
 
 export function deleteMarked(jobId) {
-  if (!repo.getAxeJob(jobId)) throw new EngineError(404, 'job axe introuvable');
+  if (!repo.getAxeJob(jobId)) throw new EngineError(404, 'axe job not found');
   const n = repo.deleteMarkedThings(jobId);
   repo.addEvent('axe.deleted', { axeJobId: jobId, deleted: n });
   return n;
@@ -199,12 +199,12 @@ export function deleteMarked(jobId) {
 // ---- Schedules ----
 export function createSchedule({ kind, targetId, cron }) {
   const every = cronIntervalMs(cron);
-  if (!every) throw new EngineError(400, 'cron invalide (ex. "@every 30s", "*/5 * * * *", "@daily")');
+  if (!every) throw new EngineError(400, 'invalid cron (e.g. "@every 30s", "*/5 * * * *", "@daily")');
   return repo.createSchedule({ kind, targetId, cron, nextRunAt: Date.now() + every });
 }
 
-// targetId (scan) : "profileId:clawId", ou un clawId (tous les profils), ou un profileId (tous les claws).
-// targetId (axe) : un accountId, ou un axeId (premier compte connecté).
+// targetId (scan): "profileId:clawId", a clawId (all profiles), or a profileId (all claws).
+// targetId (axe): an accountId or an axeId (first connected account).
 function runSchedule(s) {
   let started = 0;
   const attempt = (fn) => { try { fn(); started++; } catch (e) { if (!(e instanceof EngineError)) throw e; } };
@@ -226,11 +226,11 @@ function runSchedule(s) {
   repo.addEvent('schedule.run', { scheduleId: s.id, kind: s.kind, started });
 }
 
-// Exécute les schedules échus ; exporté pour les tests.
+// Run due schedules; exported for tests.
 export function tickScheduler(at = Date.now()) {
   for (const s of repo.dueSchedules(at)) {
     const every = cronIntervalMs(s.cron) ?? 86400000;
-    repo.updateSchedule(s.id, at, at + every); // avant l'exécution : évite toute double exécution
+    repo.updateSchedule(s.id, at, at + every); // before execution: prevent duplicate execution
     runSchedule(s);
   }
 }
@@ -247,14 +247,14 @@ export function stopScheduler() {
   if (schedulerTimer) { clearInterval(schedulerTimer); schedulerTimer = null; }
 }
 
-// ---- Cycle de vie ----
+// ---- Lifecycle ----
 export function stopAll() {
   stopScheduler();
   for (const t of timers) clearTimeout(t);
   timers.clear();
 }
 
-// Annule tous les timers et vide les données utilisateur (catalogues et réglages conservés).
+// Cancel all timers and clear user data (retain catalogs and settings).
 export function resetForTests() {
   stopAll();
   repo.wipeUserData();

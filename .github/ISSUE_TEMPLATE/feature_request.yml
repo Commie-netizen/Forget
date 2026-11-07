@@ -1,27 +1,27 @@
-name: Demande de fonctionnalité
-description: Proposer une amélioration
+name: Feature request
+description: Suggest an improvement
 labels: [enhancement]
 body:
   - type: textarea
     id: problem
     attributes:
-      label: Problème à résoudre
+      label: Problem to solve
     validations:
       required: true
   - type: textarea
     id: proposal
     attributes:
-      label: Proposition
+      label: Proposal
     validations:
       required: true
   - type: textarea
     id: alternatives
     attributes:
-      label: Alternatives envisagées
+      label: Alternatives considered
   - type: checkboxes
     id: privacy
     attributes:
-      label: Confidentialité
+      label: Privacy
       options:
-        - label: Cette proposition ne nécessite ni télémétrie ni service tiers
+        - label: This proposal requires no telemetry or third-party services
           required: true

@@ -1,4 +1,4 @@
-// Entree du serveur embarque (bundlee par build.mjs). Ecoute uniquement sur 127.0.0.1.
+// Embedded server entry point (bundled by build.mjs). Listen only on 127.0.0.1.
 import { serve } from '@hono/node-server';
 import { createApp } from '../server/src/index.mjs';
 import { startScheduler, stopScheduler } from '../server/src/engine.mjs';

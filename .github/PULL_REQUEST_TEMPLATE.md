@@ -1,17 +1,17 @@
 ## Description
 
-<!-- Quoi et pourquoi -->
+<!-- What and why -->
 
-## Type de changement
+## Type of change
 
-- [ ] Correction de bug
-- [ ] Fonctionnalité
+- [ ] Bug fix
+- [ ] Feature
 - [ ] Documentation / maintenance
 
 ## Checklist
 
-- [ ] `npm test`, `npm run test:discord`, `npm run test:privacy` passent
-- [ ] `npm run build` passe
-- [ ] Tests ajoutés ou adaptés
-- [ ] Aucun token, base de données, log ou donnée personnelle dans le diff
-- [ ] Aucune nouvelle sortie réseau hors du verrou hors-ligne, pas de télémétrie
+- [ ] `npm test`, `npm run test:discord`, `npm run test:privacy` pass
+- [ ] `npm run build` passes
+- [ ] Tests added or updated
+- [ ] No tokens, databases, logs, or personal data in the diff
+- [ ] No new outbound network traffic outside the offline lock, no telemetry

@@ -3,7 +3,7 @@ const { BrowserWindow } = require('electron');
 const { DatabaseSync } = require('node:sqlite');
 const windows = new Map();
 const urls = { facebook:'https://www.facebook.com/me/allactivity', instagram:'https://www.instagram.com/your_activity/photos_and_videos/posts/' };
-// Etat hors-ligne relu au plus toutes les 500 ms (onBeforeRequest est appele pour chaque ressource de la page).
+// Reread offline state at most every 500 ms (onBeforeRequest is called for every page resource).
 let onlineCache = { at: 0, value: false };
 function online() {
   const now = Date.now();
@@ -23,9 +23,9 @@ function allowed(url, resources = false) {
   } catch { return false; }
 }
 exports.openSocialWindow = async function(provider) {
-  if (!urls[provider] || !online()) throw new Error('Plateforme invalide ou mode hors-ligne actif');
+  if (!urls[provider] || !online()) throw new Error('Invalid platform or offline mode is on');
   const existing=windows.get(provider); if(existing && !existing.isDestroyed()){existing.show();existing.focus();return;}
-  const win=new BrowserWindow({width:1180,height:840,title:`Forget — ${provider} · nettoyage assisté`,autoHideMenuBar:true,
+  const win=new BrowserWindow({width:1180,height:840,title:`Forget — ${provider} · assisted cleanup`,autoHideMenuBar:true,
     webPreferences:{partition:`persist:forget-personal-${provider}`,nodeIntegration:false,contextIsolation:true,sandbox:true,webSecurity:true,devTools:false}});
   windows.set(provider,win);
   win.on('closed',()=>windows.delete(provider));
@@ -35,5 +35,5 @@ exports.openSocialWindow = async function(provider) {
   win.webContents.setWindowOpenHandler(()=>({action:'deny'}));
   const navigate=(e,url)=>{if(!allowed(url))e.preventDefault();};
   win.webContents.on('will-navigate',navigate);win.webContents.on('will-redirect',navigate);
-  try {await win.loadURL(urls[provider]);} catch {win.close();throw new Error('Impossible d’ouvrir la plateforme. Vérifiez votre connexion.');}
+  try {await win.loadURL(urls[provider]);} catch {win.close();throw new Error('Could not open the platform. Check your connection.');}
 };

@@ -1,5 +1,5 @@
-// Mode disparition : écoute le gateway Discord (MESSAGE_CREATE) et supprime mes propres messages après un délai.
-// Reconnexion automatique avec backoff ; fermé quand le mode est éteint.
+// Disappearing mode: listen to the Discord gateway (MESSAGE_CREATE) and delete the user's own messages after a delay.
+// Automatically reconnect with backoff; close when the mode is disabled.
 import * as store from './store.mjs';
 import { discordFetch, getTransport, sleep } from './http.mjs';
 import { archiveMessage } from './archive.mjs';
@@ -17,7 +17,7 @@ export function disappearingStatus() {
   return { ...store.getDisappearing(), running: state.running, ready: state.ready, pending: state.pending.size, deleted: state.deleted, failed: state.failed };
 }
 
-/** Démarre le watcher (idempotent : pas de double gateway). Renvoie false sans token. */
+/** Start the watcher (idempotent: no duplicate gateway). Return false without a token. */
 export function startDisappearing() {
   if (state.running) return true;
   if (!store.getToken()) return false;
@@ -29,10 +29,10 @@ export function startDisappearing() {
 
 export function stopDisappearing() {
   state.running = false;
-  state.generation++; // invalide les callbacks en attente
+  state.generation++; // invalidate pending callbacks
   state.ready = false;
   clearTimeout(state.hb);
-  state.pending.clear(); // suppressions programmées abandonnées
+  state.pending.clear(); // discard scheduled deletions
   const ws = state.ws;
   state.ws = null;
   try { ws?.close(1000); } catch { /* ignore */ }
@@ -51,7 +51,7 @@ async function connect(gen) {
   state.ws = ws;
   state.seq = null;
   ws.on('message', (raw) => onFrame(gen, ws, raw));
-  ws.on('error', () => { /* 'close' suit toujours */ });
+  ws.on('error', () => { /*'close' always follows */ });
   ws.on('close', () => {
     if (state.ws === ws) state.ws = null;
     clearTimeout(state.hb);
@@ -67,7 +67,7 @@ async function scheduleReconnect(gen) {
   connect(gen);
 }
 
-const send = (ws, payload) => { try { ws.send(JSON.stringify(payload)); } catch { /* socket fermé */ } };
+const send = (ws, payload) => { try { ws.send(JSON.stringify(payload)); } catch { /*socket closed */ } };
 const kill = (ws) => { try { (ws.terminate ?? ws.close).call(ws); } catch { /* ignore */ } };
 
 function onFrame(gen, ws, raw) {
@@ -85,7 +85,7 @@ function onFrame(gen, ws, raw) {
     }
     case 11: state.acked = true; break;
     case 1: send(ws, { op: 1, d: state.seq }); break;
-    case 7: case 9: kill(ws); break; // reconnect / session invalide -> 'close' relance une connexion
+    case 7: case 9: kill(ws); break; // reconnect / invalid session -> 'close' starts a new connection
     case 0:
       if (f.t === 'READY') { state.ready = true; state.backoff = 1000; state.userId = f.d?.user?.id ?? state.userId; }
       else if (f.t === 'MESSAGE_CREATE') onMessageCreate(f.d);
@@ -98,13 +98,13 @@ function startHeartbeat(gen, ws, interval) {
   state.acked = true;
   const beat = () => {
     if (gen !== state.generation || ws !== state.ws) return;
-    if (!state.acked) return kill(ws); // pas d'ACK : connexion zombie
+    if (!state.acked) return kill(ws); // no ACK: zombie connection
     state.acked = false;
     send(ws, { op: 1, d: state.seq });
     state.hb = setTimeout(beat, interval);
     state.hb.unref?.();
   };
-  state.hb = setTimeout(beat, Math.floor(interval * Math.random())); // jitter conseillé pour le 1er battement
+  state.hb = setTimeout(beat, Math.floor(interval * Math.random())); // jitter recommended for the first heartbeat
   state.hb.unref?.();
 }
 
@@ -125,11 +125,11 @@ function onMessageCreate(d) {
   const entry = { id: msg.id };
   state.pending.add(entry);
   sleep(cfg.delaySec * 1000).then(async () => {
-    if (!state.pending.delete(entry)) return; // mode éteint entre-temps
+    if (!state.pending.delete(entry)) return; // mode disabled in the meantime
     const t = store.getToken();
     if (!t) return;
     try {
-      archiveMessage(msg, 'disappear', { meta: { delaySec: cfg.delaySec } }); // archive AVANT suppression
+      archiveMessage(msg, 'disappear', { meta: { delaySec: cfg.delaySec } }); // archive BEFORE deletion
       await discordFetch(t.token, 'DELETE', `/channels/${msg.channelId}/messages/${msg.id}`);
       state.deleted++;
     } catch (e) {

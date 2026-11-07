@@ -11,14 +11,14 @@ import { fmtDate, nf, toMs } from '../lib.js';
 
 const DAY = 86400000;
 const PERIODS = [
-  { value: 'all', label: 'Toute la période', ms: 0 },
-  { value: 'day', label: '24 dernières heures', ms: DAY },
-  { value: 'week', label: '7 derniers jours', ms: 7 * DAY },
-  { value: 'month', label: '30 derniers jours', ms: 30 * DAY },
-  { value: 'year', label: '12 derniers mois', ms: 365 * DAY },
+  { value: 'all', label: "All time", ms: 0 },
+  { value: 'day', label: "Last 24 hours", ms: DAY },
+  { value: 'week', label: "Last 7 days", ms: 7 * DAY },
+  { value: 'month', label: "Last 30 days", ms: 30 * DAY },
+  { value: 'year', label: "Last 12 months", ms: 365 * DAY },
 ];
-const ACTION_LABEL = { delete: 'Suppression', edit: 'Édition', disappeared: 'Disparu', vanish: 'Disparu', disappearing: 'Disparu' };
-const actionLabel = (a) => ACTION_LABEL[a] || a || 'Archivé';
+const ACTION_LABEL = { delete: "Deletion", edit: "Editing", disappeared: "Disappeared", vanish: "Disappeared", disappearing: "Disappeared" };
+const actionLabel = (a) => ACTION_LABEL[a] || a || "Archived";
 const actionTone = (a) => (a === 'delete' ? 'red' : a === 'edit' ? 'blue' : 'orange');
 
 function countBy(list, key) {
@@ -30,7 +30,7 @@ function countBy(list, key) {
   return [...m.entries()].sort((a, b) => b[1] - a[1]);
 }
 
-function StatList({ title, rows, empty = 'Aucune donnée' }) {
+function StatList({ title, rows, empty = "No data" }) {
   return (
     <div>
       <h3 className="sub-title">{title}</h3>
@@ -77,7 +77,7 @@ export default function LocalArchive() {
     action: countBy(items, (x) => actionLabel(x.action)),
     month: countBy(items, (x) => {
       const ms = toMs(x.archivedAt);
-      return ms ? new Date(ms).toLocaleDateString('fr-FR', { month: 'long', year: 'numeric' }) : 'Date inconnue';
+      return ms ? new Date(ms).toLocaleDateString("en-US", { month: 'long', year: 'numeric' }) : "Unknown date";
     }),
   }), [items]);
 
@@ -85,10 +85,10 @@ export default function LocalArchive() {
     <>
       <PageHeader
         title="Local Archive"
-        subtitle="Une copie locale de chaque message avant sa suppression ou son édition."
+        subtitle="A local copy of each message before deletion or editing."
         actions={
           <>
-            <Select label="Format d’export" hideLabel value={format} onChange={setFormat} options={[{ value: 'json', label: 'JSON' }, { value: 'csv', label: 'CSV' }]} />
+            <Select label="Export format" hideLabel value={format} onChange={setFormat} options={[{ value: 'json', label: 'JSON' }, { value: 'csv', label: 'CSV' }]} />
             <a
               className={`btn primary${unavailable ? ' disabled' : ''}`}
               href={unavailable ? undefined : api.discordArchiveExportUrl(format)}
@@ -106,34 +106,34 @@ export default function LocalArchive() {
           <div className="grow">
             <h2 className="card-title">Local Archive</h2>
             <p className="muted small">
-              Conservez sur cet ordinateur le contenu de vos messages avant toute action. Les données restent dans la base SQLite locale et ne sont jamais envoyées ailleurs.
+              Save your message content on this computer before any action. Data stays in the local SQLite database and is never sent elsewhere.
             </p>
           </div>
           <Badge tone={localArchive ? 'green' : 'neutral'}>{localArchive ? 'ON' : 'OFF'}</Badge>
-          <Toggle checked={localArchive} onChange={setLocalArchive} label="Activer Local Archive" />
+          <Toggle checked={localArchive} onChange={setLocalArchive} label="Enable Local Archive" />
         </div>
       </Card>
 
-      {unavailable && <Notice tone="warn" title="Module Discord indisponible">L’archive Discord ne peut pas être lue pour le moment.</Notice>}
+      {unavailable && <Notice tone="warn" title="Discord module unavailable">The Discord archive cannot be read right now.</Notice>}
       {list.error && !unavailable && discord.state !== 'disconnected' && <Notice tone="error">{list.error}</Notice>}
 
       <Card title="Search Your Archive">
         <form className="search-panel" onSubmit={(e) => e.preventDefault()} role="search">
           <label className="search-input">
-            <span className="sr-only">Rechercher dans l’archive</span>
+            <span className="sr-only">Search the archive</span>
             <Icon name="search" size={16} />
-            <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Rechercher un message, un salon..." />
+            <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Search for a message, channel..." />
           </label>
-          <Select label="Plateforme" hideLabel value={platform} onChange={setPlatform} options={[{ value: 'all', label: 'Toutes les plateformes' }, { value: 'discord', label: 'Discord' }, { value:'twitter',label:'Twitter/X' }, {value:'reddit',label:'Reddit'}]} />
-          <Select label="Période" hideLabel value={period} onChange={setPeriod} options={PERIODS} />
-          <Select label="Tri" hideLabel value={sort} onChange={setSort} options={[{ value: 'recent', label: 'Plus récents' }, { value: 'old', label: 'Plus anciens' }]} />
+          <Select label="Platform" hideLabel value={platform} onChange={setPlatform} options={[{ value: 'all', label: "All platforms" }, { value: 'discord', label: 'Discord' }, { value:'twitter',label:'Twitter/X' }, {value:'reddit',label:'Reddit'}]} />
+          <Select label="Period" hideLabel value={period} onChange={setPeriod} options={PERIODS} />
+          <Select label="Sort" hideLabel value={sort} onChange={setSort} options={[{ value: 'recent', label: "Newest first" }, { value: 'old', label: "Oldest first" }]} />
         </form>
 
         {list.loading && !list.data ? (
           <Spinner />
         ) : items.length === 0 ? (
           <EmptyState icon="archive" title="No archives yet">
-            Les messages supprimés ou édités apparaîtront ici. Aucune archive ne correspond à ces filtres.
+            Deleted or edited messages will appear here. No archives match these filters.
           </EmptyState>
         ) : (
           <ul className="archive-list">
@@ -141,15 +141,15 @@ export default function LocalArchive() {
               <li key={a.id}>
                 <div className="row wrap">
                   <Badge tone="red">{(a.platform || 'discord').replace(/^./, (c) => c.toUpperCase())}</Badge>
-                  <span className="muted small">{[a.guildName, a.channelName && `#${a.channelName}`].filter(Boolean).join(' / ') || 'Salon inconnu'}</span>
+                  <span className="muted small">{[a.guildName, a.channelName && `#${a.channelName}`].filter(Boolean).join(' / ') || "Unknown channel"}</span>
                   <span className="grow" />
                   <Badge tone={actionTone(a.action)}>{actionLabel(a.action)}</Badge>
                   <span className="muted small">{fmtDate(a.archivedAt)}</span>
                 </div>
-                <p className="archive-text">{a.content || <em className="muted">(sans texte)</em>}</p>
+                <p className="archive-text">{a.content || <em className="muted">(no text)</em>}</p>
               </li>
             ))}
-            {items.length > 100 && <li className="muted small">{nf(items.length - 100)} autres résultats : affinez la recherche ou exportez l’archive.</li>}
+            {items.length > 100 && <li className="muted small">{nf(items.length - 100)} more results: refine your search or export the archive.</li>}
           </ul>
         )}
       </Card>
@@ -157,7 +157,7 @@ export default function LocalArchive() {
       <div className="cols">
         <Card title="Recent Activity">
           {items.length === 0 ? (
-            <p className="muted small">Aucune activité récente.</p>
+            <p className="muted small">No recent activity.</p>
           ) : (
             <ul className="list tight">
               {items.slice(0, 6).map((a) => (
@@ -169,11 +169,11 @@ export default function LocalArchive() {
             </ul>
           )}
         </Card>
-        <Card title="Archive Statistics" subtitle={`${nf(items.length)} élément(s) correspondant aux filtres`}>
+        <Card title="Archive Statistics" subtitle={`${nf(items.length)} items matching the filters`}>
           <div className="stat-cols">
-            <StatList title="Par plateforme" rows={stats.platform} />
-            <StatList title="Par action" rows={stats.action} />
-            <StatList title="Par période" rows={stats.month.slice(0, 6)} />
+            <StatList title="By platform" rows={stats.platform} />
+            <StatList title="By action" rows={stats.action} />
+            <StatList title="By period" rows={stats.month.slice(0, 6)} />
           </div>
         </Card>
       </div>

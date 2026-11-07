@@ -1,9 +1,9 @@
-// Protection du serveur local (127.0.0.1) contre les pages web ouvertes dans le navigateur de l'utilisateur.
-// - DNS rebinding : l'en-tête Host doit désigner une adresse de bouclage (127.0.0.1, localhost, [::1]).
-// - CSRF : toute requête portant un Origin doit venir de la même origine que Host ; Sec-Fetch-Site doit être
-//   same-origin ou none ; les écritures exigent l'en-tête X-Forget-Request (un site tiers ne peut pas l'ajouter
-//   sans pré-vérification CORS, et le serveur n'émet aucun en-tête CORS).
-// - En-têtes de sécurité sur toutes les réponses (CSP stricte pour l'interface).
+// Protect the local server (127.0.0.1) from web pages open in the user's browser.
+// - DNS rebinding: the Host header must specify a loopback address (127.0.0.1, localhost, [::1]).
+// - CSRF: any request with an Origin must match the Host origin; Sec-Fetch-Site must be
+// same-origin or none; writes require the X-Forget-Request header (a third-party site cannot add it
+// without a CORS preflight, and the server sends no CORS headers).
+// - Security headers on all responses (strict CSP for the UI).
 export const REQUEST_HEADER = 'x-forget-request';
 const LOOPBACK = new Set(['127.0.0.1', 'localhost', '[::1]', '::1']);
 const SAFE_METHODS = new Set(['GET', 'HEAD', 'OPTIONS']);
@@ -21,29 +21,29 @@ function hostnameOf(host) {
   return h.split(':')[0];
 }
 
-/** Renvoie un motif de refus, ou null si la requête est acceptable. Exporté pour les tests. */
+/** Return a rejection reason, or null if the request is acceptable. Exported for tests. */
 export function rejectReason({ method, host, origin, secFetchSite, marker }) {
-  if (!LOOPBACK.has(hostnameOf(host))) return 'hôte non autorisé';
+  if (!LOOPBACK.has(hostnameOf(host))) return 'host not allowed';
   if (origin && origin !== 'null') {
     let o;
-    try { o = new URL(origin); } catch { return 'origine invalide'; }
-    if (o.host.toLowerCase() !== String(host).trim().toLowerCase() || !['http:', 'https:'].includes(o.protocol)) return 'origine non autorisée';
-  } else if (origin === 'null') return 'origine opaque refusée';
-  if (secFetchSite && !['same-origin', 'none'].includes(secFetchSite)) return 'requête inter-sites refusée';
-  if (!SAFE_METHODS.has(method) && marker !== '1') return 'en-tête X-Forget-Request manquant';
+    try { o = new URL(origin); } catch { return 'invalid origin'; }
+    if (o.host.toLowerCase() !== String(host).trim().toLowerCase() || !['http:', 'https:'].includes(o.protocol)) return 'origin not allowed';
+  } else if (origin === 'null') return 'opaque origin refused';
+  if (secFetchSite && !['same-origin', 'none'].includes(secFetchSite)) return 'cross-site request refused';
+  if (!SAFE_METHODS.has(method) && marker !== '1') return 'missing X-Forget-Request header';
   return null;
 }
 
-/** Middleware Hono : garde réseau + en-têtes de sécurité. */
+/** Hono middleware: network guard and security headers. */
 export function securityMiddleware() {
   return async (c, next) => {
     const reason = rejectReason({
-      // Sans en-tête Host (appel interne / tests), l'hôte de l'URL fait foi ; le serveur Node la construit depuis Host.
+      // Without a Host header (internal calls / tests), use the URL host; the Node server constructs it from Host.
       method: c.req.method, host: c.req.header('host') || new URL(c.req.url).host, origin: c.req.header('origin'),
       secFetchSite: c.req.header('sec-fetch-site'), marker: c.req.header(REQUEST_HEADER),
     });
-    if (reason) return c.json({ error: `Requête refusée : ${reason}` }, 403);
-    if (c.req.method === 'OPTIONS') return c.body(null, 204); // aucune pré-vérification CORS n'est accordée
+    if (reason) return c.json({ error: `Request refused: ${reason}` }, 403);
+    if (c.req.method === 'OPTIONS') return c.body(null, 204); // no CORS preflight is allowed
     await next();
     const h = c.res.headers;
     h.set('X-Content-Type-Options', 'nosniff');

@@ -1,5 +1,5 @@
-// Source unique de la version applicative (serveur, archive exportée, vérification des mises à jour).
-// __FORGET_UPDATE_REPO__ est injecté par desktop/build.mjs (GITHUB_REPOSITORY en CI) ; sinon variable d'env.
+// Single source for the application version (server, exported archive, update checks).
+// __FORGET_UPDATE_REPO__ is injected by desktop/build.mjs (GITHUB_REPOSITORY in CI); otherwise use the environment variable.
 export const VERSION = '4.3.0';
 /* global __FORGET_UPDATE_REPO__ */
 const injected = typeof __FORGET_UPDATE_REPO__ === 'string' ? __FORGET_UPDATE_REPO__ : '';

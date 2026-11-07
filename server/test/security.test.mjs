@@ -1,4 +1,4 @@
-// Sécurité du serveur local : CSRF, DNS rebinding, en-têtes, injection CSV, archives ZIP hostiles.
+// Local server security: CSRF, DNS rebinding, headers, CSV injection, hostile ZIP archives.
 import assert from 'node:assert/strict';
 import { mkdtempSync, writeFileSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
@@ -16,31 +16,31 @@ async function check(name, fn) {
 }
 const base = { method: 'GET', host: '127.0.0.1:4173', origin: undefined, secFetchSite: undefined, marker: undefined };
 
-await check('garde : requêtes légitimes acceptées (interface, proxy Vite, outils locaux)', () => {
+await check('guard: legitimate requests accepted (UI, Vite proxy, local tools)', () => {
   assert.equal(rejectReason(base), null);
   assert.equal(rejectReason({ ...base, method: 'POST', origin: 'http://127.0.0.1:4173', secFetchSite: 'same-origin', marker: '1' }), null);
   assert.equal(rejectReason({ ...base, method: 'POST', host: 'localhost:5173', origin: 'http://localhost:5173', marker: '1' }), null);
   assert.equal(rejectReason({ ...base, host: '[::1]:4173' }), null);
-  assert.equal(rejectReason({ ...base, secFetchSite: 'none' }), null); // navigation directe
+  assert.equal(rejectReason({ ...base, secFetchSite: 'none' }), null); // direct navigation
 });
 
-await check('garde : DNS rebinding (Host non local) refusé', () => {
-  assert.match(rejectReason({ ...base, host: 'evil.example:4173' }), /hôte/);
-  assert.match(rejectReason({ ...base, host: '127.0.0.1.evil.example' }), /hôte/);
-  assert.match(rejectReason({ ...base, host: '' }), /hôte/);
+await check('guard: DNS rebinding (non-local Host) refused', () => {
+  assert.match(rejectReason({ ...base, host: 'evil.example:4173' }), /host/);
+  assert.match(rejectReason({ ...base, host: '127.0.0.1.evil.example' }), /host/);
+  assert.match(rejectReason({ ...base, host: '' }), /host/);
 });
 
-await check('garde : CSRF depuis un site tiers refusé (Origin, Sec-Fetch-Site, en-tête manquant)', () => {
-  assert.match(rejectReason({ ...base, method: 'POST', origin: 'https://evil.example', marker: '1' }), /origine/);
-  assert.match(rejectReason({ ...base, method: 'POST', origin: 'http://127.0.0.1:9999', marker: '1' }), /origine/); // autre port local
+await check('guard: CSRF from a third-party site refused (Origin, Sec-Fetch-Site, missing header)', () => {
+  assert.match(rejectReason({ ...base, method: 'POST', origin: 'https://evil.example', marker: '1' }), /origin/);
+  assert.match(rejectReason({ ...base, method: 'POST', origin: 'http://127.0.0.1:9999', marker: '1' }), /origin/); // another local port
   assert.match(rejectReason({ ...base, method: 'POST', origin: 'null', marker: '1' }), /opaque/);
-  assert.match(rejectReason({ ...base, secFetchSite: 'cross-site' }), /inter-sites/);
-  assert.match(rejectReason({ ...base, secFetchSite: 'same-site' }), /inter-sites/);
-  assert.match(rejectReason({ ...base, method: 'POST' }), /X-Forget-Request/); // formulaire / text/plain sans en-tête
+  assert.match(rejectReason({ ...base, secFetchSite: 'cross-site' }), /cross-site/);
+  assert.match(rejectReason({ ...base, secFetchSite: 'same-site' }), /cross-site/);
+  assert.match(rejectReason({ ...base, method: 'POST' }), /X-Forget-Request/); // form / text/plain without header
   assert.match(rejectReason({ ...base, method: 'DELETE', marker: 'yes' }), /X-Forget-Request/);
 });
 
-await check('middleware : 403 avant la route, aucun en-tête CORS, en-têtes de sécurité présents', async () => {
+await check('middleware: 403 before the route, no CORS header, security headers present', async () => {
   let reached = 0;
   const app = new Hono();
   app.use('*', securityMiddleware());
@@ -61,18 +61,18 @@ await check('middleware : 403 avant la route, aucun en-tête CORS, en-têtes de 
   assert.equal(page.headers.get('x-frame-options'), 'DENY');
 });
 
-await check('CSV : formules neutralisées, valeurs normales intactes', () => {
+await check('CSV: formulas neutralized, normal values intact', () => {
   for (const f of ['=HYPERLINK("http://x")', '+1+1', '-2+3', '@SUM(A1)', '\tcmd', '\rcmd']) assert(csvCell(f).replace(/^"/, '').startsWith("'"), f);
   assert.equal(csvCell('bonjour'), 'bonjour');
-  assert.equal(csvCell(-5), '-5'); // nombre : pas une chaîne saisie
+  assert.equal(csvCell(-5), '-5'); // number: not an entered string
   assert.equal(csvCell('a,"b"'), '"a,""b"""');
   assert.equal(csvCell(null), '');
 });
 
 const dir = mkdtempSync(join(tmpdir(), 'forget-sec-'));
 try {
-  await check('ZIP : entrées ignorées jamais décompressées, bombe ZIP stoppée par les plafonds', async () => {
-    const big = new Uint8Array(40 * 1024 * 1024); // 40 Mo de zéros, quelques Ko compressés
+  await check('ZIP: skipped entries never decompressed, ZIP bomb stopped by limits', async () => {
+    const big = new Uint8Array(40 * 1024 * 1024); // 40 MB of zeros, a few KB compressed
     const zip = zipSync({
       'activity/huge.json': big,
       'messages/c123/messages.json': strToU8('[{"ID":"1","Timestamp":"2024-01-01","Contents":"x"}]'),
@@ -86,17 +86,17 @@ try {
     await assert.rejects(async () => {
       for await (const e of zipEntries(file, want, { maxEntry: 8 * 1024 * 1024, tooBig: 'trop gros' })) seen.push([e.name, e.data.length]);
     }, /trop gros/);
-    assert.deepEqual(seen.map((x) => x[0]), ['messages/c123/messages.json']); // le gros fichier ignoré n'a pas été lu
-    // Le nom « ../../ » n'est qu'une étiquette : aucun fichier n'est écrit sur disque.
+    assert.deepEqual(seen.map((x) => x[0]), ['messages/c123/messages.json']); // the large ignored file was not read
+    // The "../../" name is only a label: no files are written to disk.
     const all = [];
     for await (const e of zipEntries(file, (n) => n.includes('evil'))) all.push(e.name);
     assert.deepEqual(all, ['../../evil/messages/c1/messages.json']);
   });
 
-  await check('ZIP : archive corrompue ou tronquée refusée proprement', async () => {
+  await check('ZIP: corrupted or truncated archive cleanly refused', async () => {
     const bad = join(dir, 'bad.zip');
-    writeFileSync(bad, Buffer.from('PK pas une archive'));
-    await assert.rejects(async () => { for await (const _ of zipEntries(bad, () => true)); }, /ZIP invalide/);
+    writeFileSync(bad, Buffer.from('PK not an archive'));
+    await assert.rejects(async () => { for await (const _ of zipEntries(bad, () => true)); }, /Invalid ZIP/);
     const zip = zipSync({ 'messages/c1/messages.json': strToU8('[]'.repeat(1000)) });
     const cut = join(dir, 'cut.zip');
     writeFileSync(cut, Buffer.from(zip).subarray(0, zip.length - 10));

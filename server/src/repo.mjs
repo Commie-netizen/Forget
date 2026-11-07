@@ -1,4 +1,4 @@
-// Accès aux données : requêtes SQL simples, JSON sérialisé en TEXT, row -> objet.
+// Data access: simple SQL queries, JSON serialized as TEXT, row -> object.
 import { randomUUID } from 'node:crypto';
 import { getDb } from './db.mjs';
 
@@ -12,13 +12,13 @@ const run = (sql, ...p) => getDb().prepare(sql).run(...p);
 const parse = (s, fallback) => { try { return s == null ? fallback : JSON.parse(s); } catch { return fallback; } };
 const bool = (v) => v === 1 || v === true;
 
-// UPDATE générique à partir d'un objet de champs (noms de colonnes fournis par le code, jamais par l'utilisateur).
+// Generic UPDATE from a field object (column names supplied by code, never by the user).
 function update(table, id, fields, extra = '') {
   const keys = Object.keys(fields);
   run(`UPDATE ${table} SET ${keys.map((k) => `${k}=?`).join(',')}${extra} WHERE id=?`, ...keys.map((k) => fields[k]), ...(extra ? [now()] : []), id);
 }
 
-// ---- Profils ----
+// ---- Profiles ----
 const profileOut = (r) => r && ({ ...r, emails: parse(r.emails, []), phones: parse(r.phones, []) });
 
 export const listProfiles = () => q('SELECT * FROM profile ORDER BY createdAt').map(profileOut);
@@ -40,7 +40,7 @@ export function updateProfile(id, d) {
   return getProfile(id);
 }
 
-// Suppression en cascade des scans, résultats, captures et suppressions du profil.
+// Cascade deletion of the profile's scans, results, screenshots, and removals.
 export function deleteProfile(id) {
   if (!getProfile(id)) return false;
   const jobs = '(SELECT id FROM scanJob WHERE profileId=?)';
@@ -54,7 +54,7 @@ export function deleteProfile(id) {
   return true;
 }
 
-// ---- Catalogues ----
+// ---- Catalogs ----
 const catOut = (r) => r && ({ ...r, demo: bool(r.demo), ...(r.enabled === undefined ? {} : { enabled: bool(r.enabled) }) });
 export const listClaws = () => q('SELECT * FROM claw ORDER BY name').map(catOut);
 export const getClaw = (id) => catOut(one('SELECT * FROM claw WHERE id=?', id));
@@ -97,7 +97,7 @@ export function createScreenshot(scanResultId, d) {
 }
 export const listScreenshots = (scanResultId) => q('SELECT * FROM screenshot WHERE scanResultId=? ORDER BY createdAt, rowid', scanResultId);
 
-// ---- Suppression (removal) ----
+// ---- Removal ----
 export const listRemovalJobs = () => q('SELECT * FROM removalJob ORDER BY createdAt DESC');
 export const getRemovalJob = (id) => one('SELECT * FROM removalJob WHERE id=?', id);
 export const findActiveRemoval = (scanResultId) =>
@@ -154,7 +154,7 @@ export function markThing(id, marked = true) {
   run('UPDATE thing SET markedForDeletion=? WHERE id=? AND isDeleted=0', marked ? 1 : 0, id);
   return getThing(id);
 }
-// Supprime (isDeleted=1) les things marqués d'un job et renvoie leur nombre.
+// Delete (isDeleted=1) marked things in a job and return their count.
 export function deleteMarkedThings(jobId) {
   const n = Number(run('UPDATE thing SET isDeleted=1 WHERE jobId=? AND markedForDeletion=1 AND isDeleted=0', jobId).changes);
   run('UPDATE axeJob SET totalDeleted=totalDeleted+? WHERE id=?', n, jobId);
@@ -176,14 +176,14 @@ export function updateSchedule(id, lastRunAt, nextRunAt) {
 }
 export const deleteSchedule = (id) => Number(run('DELETE FROM schedule WHERE id=?', id).changes) > 0;
 
-// ---- Évènements ----
+// ---- Events ----
 const eventOut = (r) => ({ ...r, payload: parse(r.payload, null) });
 export function addEvent(type, payload = {}) {
   run('INSERT INTO event VALUES (?,?,?,?)', newId(), now(), type, JSON.stringify(payload));
 }
 export const listEvents = (limit = 50) => q('SELECT * FROM event ORDER BY at DESC, rowid DESC LIMIT ?', limit).map(eventOut);
 
-// ---- Réglages ----
+// ---- Settings ----
 export function getSettings() {
   return Object.fromEntries(q('SELECT * FROM setting').map((r) => [r.key, parse(r.value, null)]));
 }
@@ -195,7 +195,7 @@ export function patchSettings(patch) {
 
 // ---- Maintenance ----
 
-// Au démarrage : les jobs restés actifs d'un processus précédent ne reprendront jamais.
+// At startup: jobs left active by a previous process will never resume.
 export function recoverInterrupted() {
   const t = now();
   run("UPDATE scanJob SET status='failed', failure='interrompu', completedAt=? WHERE status IN ('queued','running')", t);
@@ -203,7 +203,7 @@ export function recoverInterrupted() {
   run("UPDATE axeJob SET status='failed', completedAt=? WHERE status IN ('queued','running')", t);
 }
 
-// Vide les données utilisateur (conserve catalogues et réglages).
+// Clear user data (retain catalogs and settings).
 export function wipeUserData() {
   for (const t of ['profile', 'scanJob', 'scanResult', 'screenshot', 'removalJob', 'removalStep', 'axeAccount', 'axeJob', 'thing', 'schedule', 'event']) {
     run(`DELETE FROM ${t}`);

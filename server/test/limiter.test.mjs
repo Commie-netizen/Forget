@@ -41,7 +41,7 @@ const setup = () => {
 }
 {
   const { limiter: l } = setup(); let calls = 0;
-  await assert.rejects(l.run('DELETE', '/channels/1/messages/11', () => { calls++; return response(); }, () => true), /annulée/);
+  await assert.rejects(l.run('DELETE', '/channels/1/messages/11', () => { calls++; return response(); }, () => true), /cancelled/);
   assert.equal(calls, 0);
 }
 console.log('PASS limiter: bucket deadlines, independent channels, global 429, rolling cap, shared routes, cancellation');

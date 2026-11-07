@@ -1,12 +1,12 @@
-# Forget - application de bureau (Electron)
+# Forget - desktop app (Electron)
 
-Coquille Electron autour du serveur existant (`server/`) et de l'UI (`web/dist`).
-Le serveur est bundle par esbuild (aucune dependance Node externe dans l'asar) et
-ecoute uniquement sur `127.0.0.1` (port libre choisi par l'OS).
+Electron shell around the existing server (`server/`) and UI (`web/dist`).
+The server is bundled by esbuild (no external Node dependencies in the asar) and
+listens only on `127.0.0.1` (an available port chosen by the OS).
 
 ## Build
 
-Prerequis : Node 22+, `web/dist` deja construit (`npm run build` dans `web/`), `server/node_modules` installe.
+Prerequisites: Node 22+, `web/dist` already built (`npm run build` in `web/`), `server/node_modules` installed.
 
 ```
 cd desktop
@@ -14,83 +14,83 @@ npm install
 node build.mjs
 ```
 
-Sortie unique : `../dist-desktop/Forget-<version>.exe` (exécutable portable, cible electron-builder `portable`).
+Single output: `../dist-desktop/Forget-<version>.exe` (portable executable, electron-builder `portable` target).
 
-Les caches (Electron, electron-builder, fichiers temporaires de packaging) sont dans `desktop/.cache/`
-car certains environnements confinent les ecritures au workspace. Surcharge possible via
-`ELECTRON_CACHE` / `ELECTRON_BUILDER_CACHE`. Pas de signature de code ; l'icone embarquee
-dans l'exe n'est donc pas modifiee (`signAndEditExecutable: false`), l'icone de fenetre est
-appliquee a l'execution.
+Caches (Electron, electron-builder, temporary packaging files) are stored in `desktop/.cache/`
+because some environments restrict writes to the workspace. Override with
+`ELECTRON_CACHE` / `ELECTRON_BUILDER_CACHE`. No code signing; the icon embedded
+in the exe is therefore not modified (`signAndEditExecutable: false`). The window icon is
+applied at runtime.
 
-`node make-icon.mjs` regenere `assets/icon.ico` (256x256, #e5484d, lettre R (icone conservee telle quelle pour Forget)).
+`node make-icon.mjs` regenerates `assets/icon.ico` (256x256, #e5484d, letter R (icon kept unchanged for Forget)).
 
-## Test (smoke)
+## Smoke test
 
-Lancer depuis une copie hors du dossier de travail (ex. `%TEMP%`) :
+Run from a copy outside the working directory (e.g. `%TEMP%`):
 
 ```
 "Forget-<version>.exe" --smoke --smoke-out %TEMP%\forget-smoke.json
 ```
 
-Ecrit `{ok, http:{health,root}, title, url, ...}` puis quitte (code 0 si ok, 1 sinon, raison dans le JSON).
-Le smoke utilise une base SQLite jetable dans `%TEMP%`. Si la variable `ELECTRON_RUN_AS_NODE` est
-definie dans votre shell, Electron se comporte comme Node ("bad option") : la supprimer avant le test.
+Writes `{ok, http:{health,root}, title, url, ...}`, then exits (code 0 on success, 1 otherwise, with the reason in the JSON).
+The smoke test uses a disposable SQLite database in `%TEMP%`. If the `ELECTRON_RUN_AS_NODE` variable is
+set in your shell, Electron behaves like Node ("bad option"): unset it before testing.
 
-## Lancement et suppression
+## Launching and removing
 
-Lancez `Forget-<version>.exe` depuis n'importe quel dossier. Il s'extrait au démarrage dans un dossier temporaire,
-supprimé à la fermeture. Le premier lancement peut être un peu plus lent.
-Aucune installation, aucun désinstalleur et aucun raccourci créé. L'exécutable n'est pas signé :
-Windows SmartScreen peut afficher un avertissement.
+Run `Forget-<version>.exe` from any folder. At startup, it extracts itself into a temporary folder,
+which is removed on exit. The first launch may be a little slower.
+There is no installation, uninstaller, or shortcut creation. The executable is unsigned:
+Windows SmartScreen may display a warning.
 
-Pour supprimer Forget, fermez-le puis supprimez le fichier `.exe`. Les données restent dans
-`%APPDATA%\forget-desktop\data\forget.sqlite` et le profil Electron dans `%APPDATA%\Forget`.
-Pour tout effacer, supprimez aussi manuellement les dossiers `%APPDATA%\forget-desktop` et `%APPDATA%\Forget`.
+To remove Forget, close it and delete the `.exe` file. Data remains in
+`%APPDATA%\forget-desktop\data\forget.sqlite`, and the Electron profile remains in `%APPDATA%\Forget`.
+To remove everything, also manually delete the `%APPDATA%\forget-desktop` and `%APPDATA%\Forget` folders.
 
-Le bouton **Mettre à jour** télécharge `Forget-<version>.exe` de la dernière release GitHub et vérifie son SHA-256
-avec `SHA256SUMS.txt`. À la fermeture, Forget remplace le fichier `.exe` en cours d'utilisation, puis relance Forget.
-Une release contient exactement `Forget-<version>.exe` et `SHA256SUMS.txt`.
+The **Update** button downloads `Forget-<version>.exe` from the latest GitHub release and verifies its SHA-256
+with `SHA256SUMS.txt`. On exit, Forget replaces the `.exe` file currently in use, then restarts Forget.
+A release contains exactly `Forget-<version>.exe` and `SHA256SUMS.txt`.
 
-## Donnees et migration
+## Data and migration
 
-Base : `%APPDATA%\forget-desktop\data\forget.sqlite` (variable `FORGET_DB_PATH` pour un autre emplacement).
-`FORGET_APPDATA_DIR=<dossier>` remplace `%APPDATA%` (tests).
-Le JSON du smoke contient alors `migrated` et `dbPath`.
+Database: `%APPDATA%\forget-desktop\data\forget.sqlite` (use the `FORGET_DB_PATH` variable for another location).
+`FORGET_APPDATA_DIR=<dossier>` overrides `%APPDATA%` (tests).
+The smoke test JSON then includes `migrated` and `dbPath`.
 
-## Securite
+## Security
 
-Contexte isole, sandbox, pas de nodeIntegration, navigation et fenetres externes refusees,
-`webRequest` n'autorise que `http://127.0.0.1:<port>`, toutes permissions refusees,
-mono-instance, pas de crash reporter ; mise a jour uniquement sur clic (exécutable portable vérifié par SHA-256). `FORGET_DEV=1` active les DevTools (Ctrl+Maj+I).
+Isolated context, sandbox, no nodeIntegration, external navigation and windows denied,
+`webRequest` allows only `http://127.0.0.1:<port>`, all permissions denied,
+single instance, no crash reporter; updates only when clicked (portable executable verified by SHA-256). `FORGET_DEV=1` enables DevTools (Ctrl+Shift+I).
 
 ## Splash (V5 C5)
 
-Au lancement (hors `--smoke`), `main.js` ouvre une fenetre frameless 480x360 (fond `#0b0d10`) chargee
-depuis `splash.html` : logo « FORGET » en bloc clair, 3 points animes, astuces rotatives
-(« Les purges continuent en arriere-plan », ...). Le HTML est charge en URL `data:` car le filtre reseau
-de la session n'autorise que `127.0.0.1`. La fenetre principale reste cachee jusqu'a son chargement,
-puis le splash est ferme (fallback : 15 s). Pas de splash en mode `--smoke`.
+At startup (except with `--smoke`), `main.js` opens a frameless 480x360 window (background `#0b0d10`) loaded
+from `splash.html`: a light-colored block "FORGET" logo, 3 animated dots, rotating tips
+("Purges continue in the background", ...). The HTML is loaded through a `data:` URL because the session's network
+filter allows only `127.0.0.1`. The main window stays hidden until it has loaded,
+then the splash closes (fallback: 15 s). No splash in `--smoke` mode.
 
-## Connexion Discord integree (V5 C1)
+## Integrated Discord login (V5 C1)
 
-`globalThis.__FORGET_LOGIN_WINDOW` est defini avant l'import du bundle serveur ; la route serveur
-`POST /api/discord/login-window` l'appelle. `openDiscordLogin()` ouvre une fenetre modale 520x760
+`globalThis.__FORGET_LOGIN_WINDOW` is defined before the server bundle is imported; the server route
+`POST /api/discord/login-window` calls it. `openDiscordLogin()` opens a 520x760 modal window
 (partition `persist:forget-discord-login`, `https://discord.com/login`, sandbox, contextIsolation,
-nodeIntegration off, sans preload, `window.open` refuse, navigation limitee a `discord.com` / `*.discord.com`).
-Quand l'URL est `discord.com/app` ou `discord.com/channels/...`, on lit `localStorage.getItem('token')`
-(sur evenements de navigation + sondage 1,5 s). Resultat : `{ token }` (fenetre fermee),
-`{ cancelled: true }` si l'utilisateur ferme la fenetre, `{ error }` si le chargement echoue.
-Listeners et timer sont nettoyes ; un seul login a la fois. Aucune lecture hors du localStorage de cette fenetre.
+nodeIntegration off, no preload, `window.open` denied, navigation limited to `discord.com` / `*.discord.com`).
+When the URL is `discord.com/app` or `discord.com/channels/...`, it reads `localStorage.getItem('token')`
+(on navigation events + polling every 1.5 s). Result: `{ token }` (window closed),
+`{ cancelled: true }` if the user closes the window, `{ error }` if loading fails.
+Listeners and the timer are cleaned up; only one login at a time. Nothing is read outside this window's localStorage.
 
-## Chiffrement du token (V5 C2)
+## Token encryption (V5 C2)
 
-Avant `startServer`, si `safeStorage.isEncryptionAvailable()` (DPAPI sous Windows),
-`globalThis.__FORGET_CIPHER = { encrypt, decrypt }` (base64) est fourni au serveur, qui stocke le token
-sous la forme `enc:v1:<base64>`. Sinon le serveur reste en clair (`cipher: "plain"`).
-Electron 45 signale ces API `safeStorage` synchrones comme deprecated (avertissement console, fonctionnel).
+Before `startServer`, if `safeStorage.isEncryptionAvailable()` (DPAPI on Windows),
+`globalThis.__FORGET_CIPHER = { encrypt, decrypt }` (base64) is provided to the server, which stores the token
+as `enc:v1:<base64>`. Otherwise, the server keeps it in plain text (`cipher: "plain"`).
+Electron 45 marks these synchronous `safeStorage` APIs as deprecated (console warning, still functional).
 
 ## Test
 
-`node build.mjs` puis, depuis une copie de `Forget-<version>.exe` dans `%TEMP%` et sans `ELECTRON_RUN_AS_NODE` :
-`"Forget-<version>.exe" --smoke --smoke-out %TEMP%\forget-smoke.json`. Le port du serveur est choisi par l'OS
-(trouver-le via `netstat -ano` sur le PID de Forget.exe pour tester `/api/security` ou `/api/discord/login-window`).
+Run `node build.mjs`, then, from a copy of `Forget-<version>.exe` in `%TEMP%` and without `ELECTRON_RUN_AS_NODE`:
+`"Forget-<version>.exe" --smoke --smoke-out %TEMP%\forget-smoke.json`. The server port is chosen by the OS
+(find it using `netstat -ano` with the PID of Forget.exe to test `/api/security` or `/api/discord/login-window`).

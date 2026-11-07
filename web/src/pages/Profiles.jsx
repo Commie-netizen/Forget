@@ -76,58 +76,58 @@ export default function Profiles() {
 
   return (
     <>
-      <PageHeader title="Profils" subtitle="Les informations recherchées chez les data brokers." />
+      <PageHeader title="Profiles" subtitle="The information to search for at data brokers." />
       <Notice tone="error">{error}</Notice>
       <div className="cols">
-        <Card title={`Profils (${profiles.length})`}>
+        <Card title={`Profiles (${profiles.length})`}>
           {profiles.length === 0 ? (
-            <EmptyState icon="users" title="Aucun profil">Créez-en un pour lancer des analyses.</EmptyState>
+            <EmptyState icon="users" title="No profiles">Create one to start scanning.</EmptyState>
           ) : (
             <ul className="list">
               {profiles.map((p) => (
                 <li key={p.id} className="row wrap">
                   <div className="grow">
-                    <strong>{p.primaryName}</strong> {p.id === activeId && <Badge tone="green">Actif</Badge>}
+                    <strong>{p.primaryName}</strong> {p.id === activeId && <Badge tone="green">Active</Badge>}
                     <div className="muted small">
-                      {[p.primaryAddress, p.dateOfBirth, toList(p.emails).join(', '), toList(p.phones).join(', ')].filter(Boolean).join(' · ') || 'Aucun détail'}
+                      {[p.primaryAddress, p.dateOfBirth, toList(p.emails).join(', '), toList(p.phones).join(', ')].filter(Boolean).join(' · ') || "No details"}
                     </div>
                   </div>
                   <div className="actions">
-                    {p.id !== activeId && <button type="button" className="btn sm" onClick={() => setActiveId(p.id)}>Activer</button>}
-                    <button type="button" className="btn sm" onClick={() => edit(p)}>Modifier</button>
-                    <button type="button" className="btn sm danger" onClick={() => setToDelete(p)}>Supprimer</button>
+                    {p.id !== activeId && <button type="button" className="btn sm" onClick={() => setActiveId(p.id)}>Activate</button>}
+                    <button type="button" className="btn sm" onClick={() => edit(p)}>Edit</button>
+                    <button type="button" className="btn sm danger" onClick={() => setToDelete(p)}>Delete</button>
                   </div>
                 </li>
               ))}
             </ul>
           )}
         </Card>
-        <Card title={editId ? 'Modifier le profil' : 'Nouveau profil'}>
+        <Card title={editId ? "Edit profile" : "New profile"}>
           <form onSubmit={submit} className="stack">
-            <Field label="Nom complet"><input value={form.primaryName} onChange={set('primaryName')} required /></Field>
-            <Field label="Adresse"><input value={form.primaryAddress} onChange={set('primaryAddress')} /></Field>
-            <Field label="Date de naissance"><input type="date" value={form.dateOfBirth} onChange={set('dateOfBirth')} /></Field>
-            <Field label="E-mails (séparés par des virgules)"><input value={form.emails} onChange={set('emails')} placeholder="a@exemple.fr, b@exemple.fr" /></Field>
-            <Field label="Téléphones (séparés par des virgules)"><input value={form.phones} onChange={set('phones')} placeholder="+33 6 00 00 00 00" /></Field>
+            <Field label="Full name"><input value={form.primaryName} onChange={set('primaryName')} required /></Field>
+            <Field label="Address"><input value={form.primaryAddress} onChange={set('primaryAddress')} /></Field>
+            <Field label="Date of birth"><input type="date" value={form.dateOfBirth} onChange={set('dateOfBirth')} /></Field>
+            <Field label="Emails (comma-separated)"><input value={form.emails} onChange={set('emails')} placeholder="a@example.com, b@example.com" /></Field>
+            <Field label="Phone numbers (comma-separated)"><input value={form.phones} onChange={set('phones')} placeholder="+1 202 555 0123" /></Field>
             <div className="actions">
-              <button type="submit" className="btn primary" disabled={busy}>{editId ? 'Enregistrer' : 'Créer'}</button>
-              {editId && <button type="button" className="btn" onClick={reset}>Annuler</button>}
+              <button type="submit" className="btn primary" disabled={busy}>{editId ? "Save" : "Create"}</button>
+              {editId && <button type="button" className="btn" onClick={reset}>Cancel</button>}
             </div>
           </form>
         </Card>
       </div>
       <Modal
         open={!!toDelete}
-        title="Supprimer ce profil ?"
+        title="Delete this profile?"
         onClose={() => setToDelete(null)}
         footer={
           <>
-            <button type="button" className="btn" data-autofocus onClick={() => setToDelete(null)}>Annuler</button>
-            <button type="button" className="btn danger-solid" onClick={remove}>Supprimer</button>
+            <button type="button" className="btn" data-autofocus onClick={() => setToDelete(null)}>Cancel</button>
+            <button type="button" className="btn danger-solid" onClick={remove}>Delete</button>
           </>
         }
       >
-        <p>Le profil « {toDelete?.primaryName} » sera supprimé.</p>
+        <p>The profile "{toDelete?.primaryName}" will be deleted.</p>
       </Modal>
     </>
   );

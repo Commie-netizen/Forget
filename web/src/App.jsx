@@ -63,7 +63,7 @@ export default function App() {
   const profilesLoad = useLoad(() => api.listProfiles());
   const settings = useLoad(() => api.getSettings());
 
-  // Préférence « Local Archive » : réglage serveur si présent, sinon localStorage.
+  // Local Archive preference: use the server setting if present, otherwise localStorage.
   useEffect(() => {
     const v = settings.data?.localArchive;
     if (v !== undefined && v !== null) setLocalArchiveState(truthy(v));
@@ -74,7 +74,7 @@ export default function App() {
     try {
       await api.patchSettings({ localArchive: on });
     } catch {
-      /* conservé localement */
+      /* saved locally */
     }
   }, []);
 
@@ -106,7 +106,7 @@ export default function App() {
 
   return (
     <AppContext.Provider value={ctx}>
-      <a className="skip-link" href="#contenu">Aller au contenu</a>
+      <a className="skip-link" href="#contenu">Skip to content</a>
       <div className="shell">
         <Sidebar
           social={social.data || []}
@@ -122,7 +122,7 @@ export default function App() {
           <JobsBanner onView={(provider) => navigate(provider)} />
           {apiOk === false && (
             <div className="notice error top-notice" role="alert">
-              API indisponible. Vérifiez que le serveur tourne sur 127.0.0.1:4173.
+              API unavailable. Check that the server is running at 127.0.0.1:4173.
             </div>
           )}
           <main id="contenu" className="content" tabIndex={-1}>
@@ -132,31 +132,31 @@ export default function App() {
       </div>
       <Modal
         open={addOpen}
-        title="Ajouter un compte"
+        title="Add an account"
         onClose={() => setAddOpen(false)}
-        footer={<button type="button" className="btn" onClick={() => setAddOpen(false)}>Fermer</button>}
+        footer={<button type="button" className="btn" onClick={() => setAddOpen(false)}>Close</button>}
       >
-        <p className="muted small">Choisissez la plateforme à relier à votre espace local.</p>
+        <p className="muted small">Choose a platform to connect to your local workspace.</p>
         <ul className="platform-list">
           <li>
-            <div><strong>Discord</strong><div className="muted small">Votre propre compte, via votre token.</div></div>
+            <div><strong>Discord</strong><div className="muted small">Your own account, using your token.</div></div>
             <button
               type="button"
               className="btn primary sm"
               data-autofocus
               onClick={() => { setAddOpen(false); navigate('overview'); }}
             >
-              {ds.state === 'connected' ? 'Gérer' : 'Connecter'}
+              {ds.state === 'connected' ? "Manage" : "Connect"}
             </button>
           </li>
           <li>
-            <div><strong>TikTok</strong><div className="muted small">Republications · votre session web, retrait cadencé.</div></div>
-            <button className="btn primary sm" onClick={() => { setAddOpen(false); navigate('tiktok'); }}>Ouvrir</button>
+            <div><strong>TikTok</strong><div className="muted small">Reposts · your web session, paced removal.</div></div>
+            <button className="btn primary sm" onClick={() => { setAddOpen(false); navigate('tiktok'); }}>Open</button>
           </li>
           {SOCIAL_PLATFORMS.map((p) => (
             <li key={p.id}>
-              <div><strong>{p.name}</strong><div className="muted small">{['facebook','instagram'].includes(p.id) ? 'Compte personnel · nettoyage assisté.' : 'Publications · connexion OAuth utilisateur.'}</div></div>
-              <button className="btn primary sm" onClick={() => { setAddOpen(false); navigate(p.id); }}>{['facebook','instagram'].includes(p.id) ? 'Ouvrir' : (social.data || []).some(s => s.provider === p.id && s.connected) ? 'Gérer' : 'Connecter'}</button>
+              <div><strong>{p.name}</strong><div className="muted small">{['facebook','instagram'].includes(p.id) ? "Personal account · guided cleanup." : "Posts · user OAuth connection."}</div></div>
+              <button className="btn primary sm" onClick={() => { setAddOpen(false); navigate(p.id); }}>{['facebook','instagram'].includes(p.id) ? "Open" : (social.data || []).some(s => s.provider === p.id && s.connected) ? "Manage" : "Connect"}</button>
             </li>
           ))}
         </ul>

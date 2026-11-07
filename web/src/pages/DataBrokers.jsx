@@ -9,16 +9,16 @@ import Progress from '../components/Progress.jsx';
 import { fmtDate, isActive, nf, toList } from '../lib.js';
 
 const STEP_TYPES = [
-  ['submit', 'Soumission'],
-  ['verify', 'Vérification'],
-  ['poll', 'Suivi'],
-  ['done', 'Terminé'],
+  ['submit', "Submission"],
+  ['verify', "Verification"],
+  ['poll', "Follow-up"],
+  ['done', "Completed"],
 ];
 
 function Timeline({ steps }) {
   const done = new Map((steps || []).map((s) => [s.type || s.name, s]));
   return (
-    <ol className="timeline" aria-label="Étapes de suppression">
+    <ol className="timeline" aria-label="Removal steps">
       {STEP_TYPES.map(([type, label]) => {
         const s = done.get(type);
         return (
@@ -38,7 +38,7 @@ function Row({ label, items }) {
   return (
     <div className="kv-row">
       <dt>{label}</dt>
-      <dd>{items.join(' ; ')}</dd>
+      <dd>{items.join("; ")}</dd>
     </div>
   );
 }
@@ -58,11 +58,11 @@ function ResultCard({ result, removal, onRemove, busy }) {
     <div className="result">
       <div className="row wrap">
         <div className="grow">
-          <strong>{names.join(', ') || 'Identité inconnue'}</strong>
-          {result.age != null && <span className="muted"> · {result.age} ans</span>}
+          <strong>{names.join(', ') || "Unknown identity"}</strong>
+          {result.age != null && <span className="muted"> · {result.age} years old</span>}
           {result.profileUrl && (
             <div className="small ellipsis">
-              {/^https?:\/\//i.test(String(result.profileUrl)) /* jamais de lien javascript: ou data: */
+              {/^https?:\/\//i.test(String(result.profileUrl)) /* never link to javascript: or data: URLs */
                 ? <a href={result.profileUrl} target="_blank" rel="noopener noreferrer">{result.profileUrl}</a>
                 : <span>{String(result.profileUrl)}</span>}
             </div>
@@ -70,13 +70,13 @@ function ResultCard({ result, removal, onRemove, busy }) {
         </div>
         <div className="actions">
           <button type="button" className="btn sm" aria-expanded={open} onClick={() => setOpen(!open)}>
-            {open ? 'Masquer le détail' : 'Voir le détail'}
+            {open ? "Hide details" : "View details"}
           </button>
           {removal ? (
             <StatusBadge value={removal.status} />
           ) : (
             <button type="button" className="btn sm danger-solid" disabled={busy} onClick={() => onRemove(result)}>
-              Demander la suppression
+              Request removal
             </button>
           )}
         </div>
@@ -84,30 +84,30 @@ function ResultCard({ result, removal, onRemove, busy }) {
       {open && (
         <div className="result-detail">
           <dl className="kv-block">
-            <Row label="Identité" items={names} />
-            <Row label="Adresses" items={toList(result.addresses)} />
-            <Row label="E-mails" items={toList(result.emails)} />
-            <Row label="Téléphones" items={toList(result.phones)} />
-            <Row label="Proches" items={toList(result.relatives)} />
+            <Row label="Identity" items={names} />
+            <Row label="Addresses" items={toList(result.addresses)} />
+            <Row label="Emails" items={toList(result.emails)} />
+            <Row label="Phone numbers" items={toList(result.phones)} />
+            <Row label="Relatives" items={toList(result.relatives)} />
             {extras && typeof extras === 'object' && Object.entries(extras).map(([k, v]) => (
               <Row key={k} label={k} items={toList(v).length ? toList(v) : [String(v)]} />
             ))}
           </dl>
-          <h4 className="sub-title">Preuves</h4>
+          <h4 className="sub-title">Evidence</h4>
           {detail.loading ? (
             <Spinner />
           ) : shots.length === 0 ? (
-            <p className="muted small">Aucune capture disponible.</p>
+            <p className="muted small">No screenshots available.</p>
           ) : (
             <div className="shots">
               {shots.map((s) => (
                 <figure key={s.id}>
                   {typeof s.data === 'string' && s.data.startsWith('data:image/') ? (
-                    <img src={s.data} alt={s.label || 'Capture'} />
+                    <img src={s.data} alt={s.label || "Screenshot"} />
                   ) : (
-                    <div className="shot-ph">Capture</div>
+                    <div className="shot-ph">Screenshot</div>
                   )}
-                  <figcaption className="muted small">{s.label || s.kind || 'Capture'}</figcaption>
+                  <figcaption className="muted small">{s.label || s.kind || "Screenshot"}</figcaption>
                 </figure>
               ))}
             </div>
@@ -139,7 +139,7 @@ export default function DataBrokers() {
     { poll: (d) => !!d && (d.scans.some((j) => isActive(j.status)) || d.removals.some((j) => isActive(j.status))) }
   );
 
-  // Progression du scan massif : liste légère de tous les jobs (sans détail), rafraîchie toutes les 1500 ms.
+  // Bulk scan progress: lightweight list of all jobs (without details), refreshed every 1500 ms.
   const allJobs = useLoad(() => api.listScanJobs(), {
     poll: (d) => scanAll.jobIds.length > 0 && (!Array.isArray(d) || d.some((j) => scanAll.jobIds.includes(j.id) && isActive(j.status))),
   });
@@ -189,7 +189,7 @@ export default function DataBrokers() {
       setScanAll((s) => ({
         ...s,
         busy: false,
-        notice: api.isMissingEndpoint(e) ? 'Le scan massif n’est pas disponible sur ce serveur.' : '',
+        notice: api.isMissingEndpoint(e) ? "Bulk scanning is unavailable on this server." : '',
       }));
       if (!api.isMissingEndpoint(e)) setError(e.message);
     }
@@ -211,31 +211,31 @@ export default function DataBrokers() {
   }
 
   const tabs = [
-    ['catalog', `Catalogue (${nf(clawList.length)})`],
-    ['results', `Résultats (${resultCount})`],
-    ['removals', `Suppressions (${removals.length})`],
+    ['catalog', `Catalog (${nf(clawList.length)})`],
+    ['results', `Results (${resultCount})`],
+    ['removals', `Removals (${removals.length})`],
   ];
 
   return (
     <>
       <PageHeader
         title="Data Brokers"
-        subtitle="Trouvez et faites retirer vos informations personnelles."
+        subtitle="Find and request removal of your personal information."
         actions={<Badge tone="blue">Beta</Badge>}
       />
       <Notice tone="error">{error || claws.error || jobs.error}</Notice>
       {!activeProfile && (
         <Notice
           tone="warn"
-          title="Aucun profil actif"
-          action={<button type="button" className="btn sm" onClick={() => navigate('profiles')}>Créer un profil</button>}
+          title="No active profile"
+          action={<button type="button" className="btn sm" onClick={() => navigate('profiles')}>Create a profile</button>}
         >
-          Un profil est nécessaire pour lancer un scan.
+          A profile is required to start a scan.
         </Notice>
       )}
-      {activeProfile && <p className="muted small">Profil actif : <strong>{activeProfile.primaryName}</strong> · <button type="button" className="link" onClick={() => navigate('profiles')}>Changer</button></p>}
+      {activeProfile && <p className="muted small">Active profile: <strong>{activeProfile.primaryName}</strong> · <button type="button" className="link" onClick={() => navigate('profiles')}>Change</button></p>}
 
-      <div className="tabs" role="tablist" aria-label="Sections Data Brokers">
+      <div className="tabs" role="tablist" aria-label="Data Brokers sections">
         {tabs.map(([id, label]) => (
           <button key={id} type="button" role="tab" aria-selected={tab === id} className={tab === id ? 'on' : ''} onClick={() => setTab(id)}>{label}</button>
         ))}
@@ -245,9 +245,9 @@ export default function DataBrokers() {
         <>
           <div className="row wrap">
             <p className="grow" role="status">
-              <strong>{nf(clawList.length)}</strong> data broker(s) disponible(s)
-              {(cat || filter) && <> · <strong>{nf(shown.length)}</strong> affiché(s)</>}
-              {' '}· aucun maximum de scan.
+              <strong>{nf(clawList.length)}</strong> data brokers available
+              {(cat || filter) && <> · <strong>{nf(shown.length)}</strong> shown</>}
+              {' '}· no scan limit.
             </p>
             <button
               type="button"
@@ -255,33 +255,33 @@ export default function DataBrokers() {
               disabled={!activeProfile || scanAll.busy || batchRunning || clawList.length === 0}
               onClick={runScanAll}
             >
-              {scanAll.busy ? 'Lancement...' : 'Scanner tous les brokers'}
+              {scanAll.busy ? "Starting..." : "Scan all brokers"}
             </button>
           </div>
           {scanAll.notice && <Notice tone="warn">{scanAll.notice}</Notice>}
           {scanAll.jobIds.length > 0 && (
             <div className="stack">
-              <Progress label="Progression du scan massif" value={batchDone} max={Math.max(batchTotal, 1)} tone={batchRunning ? 'blue' : 'green'} />
+              <Progress label="Bulk scan progress" value={batchDone} max={Math.max(batchTotal, 1)} tone={batchRunning ? 'blue' : 'green'} />
               <p className="muted small" role="status" aria-live="polite">
-                {nf(batchDone)} / {nf(batchTotal)} terminé(s){batchRunning ? '' : ' · scan massif terminé'}.
-                {' '}<button type="button" className="link" onClick={() => setTab('results')}>Voir les résultats</button>
+                {nf(batchDone)} / {nf(batchTotal)} completed{batchRunning ? '' : " · bulk scan complete"}.
+                {' '}<button type="button" className="link" onClick={() => setTab('results')}>View results</button>
               </p>
             </div>
           )}
           <div className="filters">
             <label className="search-input">
-              <span className="sr-only">Filtrer le catalogue</span>
-              <input value={filter} onChange={(e) => setFilter(e.target.value)} placeholder="Filtrer par nom ou site..." />
+              <span className="sr-only">Filter the catalog</span>
+              <input value={filter} onChange={(e) => setFilter(e.target.value)} placeholder="Filter by name or website..." />
             </label>
-            <select aria-label="Catégorie" value={cat} onChange={(e) => setCat(e.target.value)}>
-              <option value="">Toutes les catégories ({nf(clawList.length)})</option>
+            <select aria-label="Category" value={cat} onChange={(e) => setCat(e.target.value)}>
+              <option value="">All categories ({nf(clawList.length)})</option>
               {categories.map((c) => <option key={c} value={c}>{c} ({nf(clawList.filter((x) => x.category === c).length)})</option>)}
             </select>
           </div>
           {claws.loading && !claws.data ? (
             <Spinner />
           ) : shown.length === 0 ? (
-            <EmptyState icon="shield" title="Aucun data broker">Aucun résultat dans le catalogue.</EmptyState>
+            <EmptyState icon="shield" title="No data brokers">No results in the catalog.</EmptyState>
           ) : (
             <div className="grid cards">
               {shown.map((c) => (
@@ -290,7 +290,7 @@ export default function DataBrokers() {
                   <div className="muted small">{c.website}</div>
                   <p className="small">{c.description}</p>
                   <button type="button" className="btn sm primary" disabled={!activeProfile || pending === c.id || c.enabled === 0} onClick={() => scan(c)}>
-                    {pending === c.id ? 'Lancement...' : 'Scanner'}
+                    {pending === c.id ? "Starting..." : "Scan"}
                   </button>
                 </article>
               ))}
@@ -301,7 +301,7 @@ export default function DataBrokers() {
 
       {tab === 'results' &&
         (scans.length === 0 ? (
-          <EmptyState icon="search" title="Aucun scan lancé">Lancez un scan depuis le catalogue.</EmptyState>
+          <EmptyState icon="search" title="No scans started">Start a scan from the catalog.</EmptyState>
         ) : (
           <div className="stack">
             {scans.map((j) => (
@@ -310,8 +310,8 @@ export default function DataBrokers() {
                   <strong className="grow">{clawName(j.clawId)}</strong>
                   <StatusBadge value={j.status} />
                 </div>
-                <div className="muted small">Créé le {fmtDate(j.createdAt)}{j.failure ? ` · ${j.failure}` : ''}</div>
-                {isActive(j.status) && <p className="muted small">Scan en cours...</p>}
+                <div className="muted small">Created on {fmtDate(j.createdAt)}{j.failure ? ` · ${j.failure}` : ''}</div>
+                {isActive(j.status) && <p className="muted small">Scanning...</p>}
                 {j.results?.length > 0 && (
                   <div className="results">
                     {j.results.map((r) => (
@@ -319,7 +319,7 @@ export default function DataBrokers() {
                     ))}
                   </div>
                 )}
-                {j.status === 'succeeded' && j.results?.length === 0 && <p className="muted small">Aucune donnée vous concernant trouvée.</p>}
+                {j.status === 'succeeded' && j.results?.length === 0 && <p className="muted small">No data about you found.</p>}
               </Card>
             ))}
           </div>
@@ -327,7 +327,7 @@ export default function DataBrokers() {
 
       {tab === 'removals' &&
         (removals.length === 0 ? (
-          <EmptyState icon="trash" title="Aucune suppression demandée">Demandez la suppression depuis un résultat.</EmptyState>
+          <EmptyState icon="trash" title="No removals requested">Request removal from a result.</EmptyState>
         ) : (
           <div className="stack">
             {removals.map((r) => (
@@ -345,13 +345,13 @@ export default function DataBrokers() {
 
       <Confirm
         open={!!confirmRes}
-        title="Demander la suppression ?"
-        confirmLabel="Envoyer la demande"
+        title="Request removal?"
+        confirmLabel="Send request"
         busy={!!pending}
         onCancel={() => setConfirmRes(null)}
         onConfirm={remove}
       >
-        <p>Une demande de retrait sera envoyée pour l’entrée « {toList(confirmRes?.names).join(', ') || 'identité inconnue'} » auprès du data broker concerné.</p>
+        <p>A removal request for the entry "{toList(confirmRes?.names).join(', ') || "unknown identity"}" will be sent to the relevant data broker.</p>
       </Confirm>
     </>
   );

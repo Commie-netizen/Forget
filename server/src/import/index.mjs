@@ -1,2 +1,2 @@
-// Bridge natif : import d'export Discord / base Forget Engine et plans de suppression.
+// Native bridge: import Discord exports / Forget Engine databases and create deletion plans.
 export { initImport, importRouter } from './bridge.mjs';

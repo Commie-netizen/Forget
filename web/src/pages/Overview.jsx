@@ -24,7 +24,7 @@ export default function Overview() {
     e.preventDefault();
     const t = token.trim();
     if (!t) {
-      setError('Saisissez votre token Discord.');
+      setError("Enter your Discord token.");
       return;
     }
     setBusy(true);
@@ -34,7 +34,7 @@ export default function Overview() {
       setToken('');
       await reloadDiscord();
     } catch (err) {
-      setError(err.status === 401 ? 'Token invalide : Discord l’a refusé.' : err.message);
+      setError(err.status === 401 ? "Invalid token: Discord rejected it." : err.message);
     } finally {
       setBusy(false);
     }
@@ -49,12 +49,12 @@ export default function Overview() {
       await reloadDiscord();
     } catch (err) {
       if (err.status === 501 || err.status === 404) {
-        setInfo('Connexion intégrée réservée à l’application de bureau. Utilisez l’option avancée ci-dessous avec votre token.');
+        setInfo("Built-in login is available only in the desktop app. Use the advanced option below with your token.");
         setAdvanced(true);
       } else if (err.status === 400) {
-        setInfo('Connexion annulée.');
+        setInfo("Login cancelled.");
       } else {
-        setError(err.status === 401 ? 'Discord a refusé la connexion.' : err.message);
+        setError(err.status === 401 ? "Discord rejected the login." : err.message);
       }
     } finally {
       setBusy(false);
@@ -81,30 +81,30 @@ export default function Overview() {
 
   return (
     <>
-      <PageHeader title="Overview" subtitle="Vos comptes reliés et l’état de la protection." />
+      <PageHeader title="Overview" subtitle="Your connected accounts and protection status." />
 
       {offlineMode && !connected && (
-        <Notice tone="info" title="Mode hors-ligne actif">
-          Aucune connexion sortante n’est autorisée (protection maximale). Pour connecter Discord,
-          désactivez le mode hors-ligne dans <strong>Réglages → Confidentialité</strong>.
+        <Notice tone="info" title="Offline mode active">
+          All outgoing connections are blocked (maximum protection). To connect Discord,
+          disable offline mode in <strong>Settings → Privacy</strong>.
         </Notice>
       )}
 
       <div className="cols">
         <Card
-          title="Compte Discord"
+          title="Discord account"
           actions={
             <Badge tone={connected ? 'green' : unavailable ? 'orange' : 'neutral'}>
-              {connected ? 'Connecté' : unavailable ? 'Module indisponible' : 'Non connecté'}
+              {connected ? "Connected" : unavailable ? "Module unavailable" : "Not connected"}
             </Badge>
           }
         >
           {unavailable && (
-            <Notice tone="warn" title="Module Discord indisponible">
-              Le serveur ne répond pas sur /api/discord. La connexion sera possible dès que le module sera actif.
+            <Notice tone="warn" title="Discord module unavailable">
+              The server is not responding at /api/discord. You can connect once the module is active.
             </Notice>
           )}
-          {discord.state === 'apidown' && <Notice tone="error">API indisponible : serveur local injoignable.</Notice>}
+          {discord.state === 'apidown' && <Notice tone="error">API unavailable: local server unreachable.</Notice>}
           {error && <Notice tone="error">{error}</Notice>}
           {info && <Notice tone="info">{info}</Notice>}
 
@@ -113,41 +113,41 @@ export default function Overview() {
               <div className="identity">
                 <span className="avatar big tone-red" aria-hidden="true">{(user?.username || '?').slice(0, 1).toUpperCase()}</span>
                 <div>
-                  <strong>{user?.username || 'Compte connecté'}</strong>
+                  <strong>{user?.username || "Connected account"}</strong>
                   <div className="muted small mono">ID {user?.id || '-'}</div>
                 </div>
               </div>
               <dl className="kv">
                 <dt>Token</dt>
                 <dd className="mono">{discord.tokenMasked || '••••••••'}</dd>
-                <dt>Mode disparition</dt>
-                <dd>{discord.disappearing?.enabled ? 'Actif' : 'Désactivé'}</dd>
+                <dt>Disappearing Mode</dt>
+                <dd>{discord.disappearing?.enabled ? "Active" : "Disabled"}</dd>
               </dl>
               <div className="actions">
-                <button type="button" className="btn primary" onClick={() => navigate('discord')}>Gérer mes messages</button>
-                <button type="button" className="btn danger" onClick={() => setConfirmOut(true)}>Se déconnecter</button>
+                <button type="button" className="btn primary" onClick={() => navigate('discord')}>Manage my messages</button>
+                <button type="button" className="btn danger" onClick={() => setConfirmOut(true)}>Log out</button>
               </div>
             </div>
           ) : (
             <div className="stack">
               <div className="actions">
                 <button type="button" className="btn primary" disabled={busy || unavailable} onClick={loginWindow}>
-                  {busy ? 'Connexion...' : 'Se connecter avec Discord'}
+                  {busy ? "Connecting..." : "Log in with Discord"}
                 </button>
               </div>
-              <p className="muted small">Une fenêtre Discord s’ouvre ; votre mot de passe n’est jamais lu ni stocké par l’application.</p>
+              <p className="muted small">A Discord window opens. The app never reads or stores your password.</p>
               <details className="advanced" open={advanced} onToggle={(e) => setAdvanced(e.currentTarget.open)}>
-                <summary>Option avancée : saisir un token manuellement</summary>
+                <summary>Advanced option: enter a token manually</summary>
                 <form className="stack" onSubmit={connect} autoComplete="off">
                   <Field
-                    label="Token Discord"
-                    hint="Saisi une seule fois, stocké localement dans la base SQLite, jamais renvoyé par l’API ni transmis ailleurs qu’à discord.com."
+                    label="Discord token"
+                    hint="Entered once, stored in the local SQLite database, never returned by the API or sent anywhere except discord.com."
                   >
                     <input
                       type="password"
                       value={token}
                       onChange={(e) => setToken(e.target.value)}
-                      placeholder="Collez votre token"
+                      placeholder="Paste your token"
                       autoComplete="off"
                       spellCheck={false}
                       disabled={busy || unavailable}
@@ -155,13 +155,13 @@ export default function Overview() {
                   </Field>
                   <div className="actions">
                     <button type="submit" className="btn" disabled={busy || unavailable || !token.trim()}>
-                      {busy ? 'Vérification...' : 'Se connecter avec ce token'}
+                      {busy ? "Verifying..." : "Connect with this token"}
                     </button>
                   </div>
                 </form>
               </details>
-              <Notice tone="warn" title="Utilisez uniquement votre propre compte">
-                Automatiser un compte utilisateur peut enfreindre les conditions d’utilisation de Discord. Vous agissez sous votre responsabilité.
+              <Notice tone="warn" title="Use only your own account">
+                Automating a user account may violate Discord’s terms of service. You are responsible for your actions.
               </Notice>
             </div>
           )}
@@ -169,18 +169,18 @@ export default function Overview() {
 
         <div className="stack">
           <div className="grid stats two">
-            <Stat label="Serveurs" value={connected ? nf(counts.guildsCount) : '-'} />
-            <Stat label="Messages privés" value={connected ? nf(counts.dmCount) : '-'} />
+            <Stat label="Servers" value={connected ? nf(counts.guildsCount) : '-'} />
+            <Stat label="Direct messages" value={connected ? nf(counts.dmCount) : '-'} />
           </div>
-          <Card title="Raccourcis">
+          <Card title="Shortcuts">
             <div className="stack">
               <button type="button" className="btn" onClick={() => navigate('disappearing')}>
-                Mode disparition : {discord.disappearing?.enabled ? 'actif' : 'désactivé'}
+                Disappearing Mode: {discord.disappearing?.enabled ? "active" : "disabled"}
               </button>
               <button type="button" className="btn" onClick={() => navigate('archive')}>
-                Local Archive : {localArchive ? 'ON' : 'OFF'}
+                Local Archive: {localArchive ? 'ON' : 'OFF'}
               </button>
-              <button type="button" className="btn" onClick={() => navigate('schedule')}>Planifier une tâche</button>
+              <button type="button" className="btn" onClick={() => navigate('schedule')}>Schedule a task</button>
             </div>
           </Card>
         </div>
@@ -188,14 +188,14 @@ export default function Overview() {
 
       <Confirm
         open={confirmOut}
-        title="Se déconnecter de Discord ?"
-        confirmLabel="Se déconnecter"
+        title="Log out of Discord?"
+        confirmLabel="Log out"
         danger
         busy={busy}
         onCancel={() => setConfirmOut(false)}
         onConfirm={disconnect}
       >
-        <p>Le token sera supprimé de la base locale et le mode disparition sera arrêté. Les archives locales restent conservées.</p>
+        <p>The token will be deleted from the local database and Disappearing Mode will stop. Local archives will be kept.</p>
       </Confirm>
     </>
   );

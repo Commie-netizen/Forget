@@ -5,7 +5,7 @@ import { Card, PageHeader, Notice, Stat } from '../components/Card.jsx';
 import EmptyState from '../components/EmptyState.jsx';
 import { fmtDate, nf, isActive } from '../lib.js';
 
-// Glyphes SVG inline (24x24) pour la rangée de tuiles « courtiers ».
+// Inline SVG glyphs (24x24) for the broker tile row.
 const TILE_PATHS = [
   <><circle cx="12" cy="8" r="3.5" /><path d="M5 20c0-3.6 3.1-6 7-6s7 2.4 7 6" /></>,
   <><rect x="3.5" y="5.5" width="17" height="13" rx="2" /><path d="m4 7 8 6 8-6" /></>,
@@ -16,17 +16,17 @@ const TILE_PATHS = [
   <><circle cx="12" cy="12" r="8.5" /><path d="M3.5 12h17M12 3.5c2.5 2.5 2.5 14.5 0 17M12 3.5c-2.5 2.5-2.5 14.5 0 17" /></>,
   <><path d="M12 3 5 6v5c0 4.5 3 8 7 10 4-2 7-5.5 7-10V6l-7-3Z" /><path d="m9 12 2 2 4-4" /></>,
 ];
-const TILE_LABELS = ['Identité', 'E-mail', 'Téléphone', 'Adresse', 'Finances', 'Localisation', 'Web', 'Protection'];
+const TILE_LABELS = ["Identity", 'E-mail', "Phone", "Address", "Finance", "Location", 'Web', 'Protection'];
 
 function MassDeleteBlock({ onLaunch }) {
   return (
     <section className="promo" aria-labelledby="promo-mass">
       <div className="promo-text">
-        <span className="promo-kicker">SUPPRESSION DE MASSE</span>
-        <h2 id="promo-mass">Supprime ton empreinte numérique</h2>
-        <p className="muted">Retrouve tes messages Discord, sélectionne-les à la souris ou purge des salons entiers, en arrière-plan.</p>
+        <span className="promo-kicker">BULK DELETION</span>
+        <h2 id="promo-mass">Erase your digital footprint</h2>
+        <p className="muted">Find your Discord messages, select them with your mouse, or purge entire channels in the background.</p>
         <div className="actions">
-          <button type="button" className="btn primary" onClick={onLaunch}>Lancer une suppression</button>
+          <button type="button" className="btn primary" onClick={onLaunch}>Start deleting</button>
         </div>
       </div>
       <div className="promo-visual msg-stack" aria-hidden="true">
@@ -47,10 +47,10 @@ function BrokersBlock({ onLaunch }) {
     <section className="promo" aria-labelledby="promo-brokers">
       <div className="promo-text">
         <span className="promo-kicker">DATA BROKERS</span>
-        <h2 id="promo-brokers">Supprime-toi automatiquement de 100+ courtiers</h2>
-        <p className="muted">Scanne les courtiers de données et demande le retrait de tes informations personnelles.</p>
+        <h2 id="promo-brokers">Automatically remove yourself from 100+ data brokers</h2>
+        <p className="muted">Scan data brokers and request removal of your personal information.</p>
         <div className="actions">
-          <button type="button" className="btn primary" onClick={onLaunch}>Lancer les suppressions</button>
+          <button type="button" className="btn primary" onClick={onLaunch}>Start removals</button>
         </div>
       </div>
       <div className="promo-visual tile-row" aria-hidden="true">
@@ -84,31 +84,31 @@ export default function Home() {
 
   return (
     <>
-      <PageHeader title="Home" subtitle="Résumé de votre protection de la vie privée." />
+      <PageHeader title="Home" subtitle="Your privacy protection at a glance." />
       {brokers.error && <Notice tone="error">{brokers.error}</Notice>}
       {discord.state === 'unavailable' && (
-        <Notice tone="warn" title="Module Discord indisponible">Les statistiques Discord s’afficheront quand il sera actif.</Notice>
+        <Notice tone="warn" title="Discord module unavailable">Discord statistics will appear when it is active.</Notice>
       )}
 
       <MassDeleteBlock onLaunch={() => navigate(connected ? 'discord' : 'overview')} />
       <BrokersBlock onLaunch={() => navigate('brokers')} />
 
-      <section className="grid stats" aria-label="Statistiques">
-        <Stat label="Messages archivés" value={connected ? nf(archived) : '-'} />
-        <Stat label="Suppressions Discord" value={connected ? nf(removed) : '-'} />
-        <Stat label="Profils" value={nf(profiles.length)} />
-        <Stat label="Brokers scannés" value={nf(scans.length)} />
+      <section className="grid stats" aria-label="Statistics">
+        <Stat label="Archived messages" value={connected ? nf(archived) : '-'} />
+        <Stat label="Discord deletions" value={connected ? nf(removed) : '-'} />
+        <Stat label="Profiles" value={nf(profiles.length)} />
+        <Stat label="Brokers scanned" value={nf(scans.length)} />
       </section>
 
       <div className="cols">
-        <Card title="Activité récente">
+        <Card title="Recent activity">
           {events.length === 0 && jobs.length === 0 ? (
-            <EmptyState icon="clock" title="Aucune activité">Les scans, suppressions et archives apparaîtront ici.</EmptyState>
+            <EmptyState icon="clock" title="No activity">Scans, deletions, and archives will appear here.</EmptyState>
           ) : (
             <ul className="list">
               {jobs.slice(0, 4).map((j) => (
                 <li key={j.id} className="row">
-                  <span>Discord · {j.kind === 'edit' ? 'édition' : 'suppression'} · {nf(j.deleted || j.edited)} traités</span>
+                  <span>Discord · {j.kind === 'edit' ? "edit" : "deletion"} · {nf(j.deleted || j.edited)} processed</span>
                   <span className="muted small">{fmtDate(j.createdAt)}</span>
                 </li>
               ))}
@@ -121,15 +121,15 @@ export default function Home() {
             </ul>
           )}
         </Card>
-        <Card title="Raccourcis">
+        <Card title="Shortcuts">
           <div className="stack">
             <button type="button" className="btn primary" onClick={() => navigate(connected ? 'discord' : 'overview')}>
-              {connected ? 'Nettoyer mes messages Discord' : 'Connecter Discord'}
+              {connected ? "Clean up my Discord messages" : "Connect Discord"}
             </button>
-            <button type="button" className="btn" onClick={() => navigate('disappearing')}>Activer le mode disparition</button>
-            <button type="button" className="btn" onClick={() => navigate('archive')}>Parcourir l’archive locale</button>
-            <button type="button" className="btn" onClick={() => navigate('brokers')}>Scanner un data broker</button>
-            <button type="button" className="btn" onClick={() => navigate('profiles')}>Gérer les profils</button>
+            <button type="button" className="btn" onClick={() => navigate('disappearing')}>Enable Disappearing Mode</button>
+            <button type="button" className="btn" onClick={() => navigate('archive')}>Browse the local archive</button>
+            <button type="button" className="btn" onClick={() => navigate('brokers')}>Scan a data broker</button>
+            <button type="button" className="btn" onClick={() => navigate('profiles')}>Manage profiles</button>
           </div>
         </Card>
       </div>

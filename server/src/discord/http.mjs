@@ -1,5 +1,5 @@
-// Client REST Discord : unique point de sortie réseau (https://discord.com/api/v10 uniquement).
-// Gère les 429 (retry_after) avec retry borné. Le transport est injectable pour les tests.
+// Discord REST client: sole network exit point (https://discord.com/api/v10 only).
+// Handle 429 responses (retry_after) with bounded retries. Transport can be injected for tests.
 import { createHash } from 'node:crypto';
 import { RateLimiter } from './limiter.mjs';
 import { USER_AGENT } from '../version.mjs';
@@ -9,7 +9,7 @@ export class DiscordError extends Error {
   constructor(status, message, data = null) {
     super(message);
     this.name = 'DiscordError';
-    this.status = status; // 0 = erreur réseau
+    this.status = status; // 0 = network error
     this.data = data;
   }
 }
@@ -26,16 +26,13 @@ function limiterFor(token) {
 }
 export const rateLimitStatus = token => token ? limiterFor(token).snapshot() : null;
 
-// Remplace partiellement le transport (tests : fetchImpl, wsImpl, sleep).
+// Partially override the transport (tests: fetchImpl, wsImpl, sleep).
 export function setTransport(patch = {}) { transport = { ...transport, ...patch }; }
 export function resetTransport() { transport = defaults(); limiters.clear(); }
 export const getTransport = () => transport;
 export const sleep = (ms) => transport.sleep(ms);
 
-/**
- * Appel REST. Renvoie { status, data }. Lève DiscordError si statut non 2xx.
- * Sur 429 : attend retry_after (secondes, float) puis retente, jusqu'à maxRetries.
- */
+/** REST call. Return { status, data }. Throw DiscordError for non-2xx responses. On 429: wait retry_after (seconds, float) then retry, up to maxRetries. */
 export async function discordFetch(token, method, path, { query, body, maxRetries = 5, onRateLimit, shouldStop } = {}) {
   const url = new URL(API_BASE + path);
   for (const [k, v] of Object.entries(query ?? {})) {
@@ -58,19 +55,19 @@ export async function discordFetch(token, method, path, { query, body, maxRetrie
         return { res, data };
       }, shouldStop));
     } catch (err) {
-      // Verrou de confidentialité (privacy.mjs) : message actionnable pour l'UI.
+      // Privacy lock (privacy.mjs): actionable message for the UI.
       if (err.status === 499) throw err;
       const msg = String(err?.message || '');
       if (/offline|not allowed/i.test(msg)) {
-        throw new DiscordError(0, 'Mode hors-ligne actif : activez la connexion dans Réglages → Confidentialité.', null);
+        throw new DiscordError(0, 'Offline mode is on: allow connections in Settings > Privacy.', null);
       }
-      throw new DiscordError(0, 'Réseau Discord indisponible');
+      throw new DiscordError(0, 'Discord network unavailable');
     }
     if (res.status === 429) {
       if (attempt >= maxRetries) throw new DiscordError(429, 'Rate limit : trop de tentatives', data);
       let wait = Number(data?.retry_after ?? res.headers?.get?.('retry-after') ?? 1);
       if (!Number.isFinite(wait) || wait < 0) wait = 1;
-      const waitMs = Math.ceil(wait * 1000) + attempt * 250; // backoff léger croissant
+      const waitMs = Math.ceil(wait * 1000) + attempt * 250; // small, increasing backoff
       onRateLimit?.({ attempt: attempt + 1, retryAfterMs: waitMs, global: !!data?.global });
       // The shared scheduler enforces this deadline for every caller, including retries.
       continue;

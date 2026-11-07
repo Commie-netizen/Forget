@@ -1,6 +1,6 @@
-// Utilitaires partagés : snowflakes Discord, normalisation des messages, parsing de dates.
+// Shared utilities: Discord snowflakes, message normalization, date parsing.
 export const DISCORD_EPOCH = 1420070400000n;
-// Limite Discord du bulk-delete : messages de moins de 14 jours (marge de 10 min).
+// Discord bulk-delete limit: messages under 14 days old (10-minute margin).
 export const BULK_MAX_AGE_MS = 14 * 24 * 3600 * 1000 - 10 * 60 * 1000;
 
 export const snowflakeToMs = (id) => Number((BigInt(id) >> 22n) + DISCORD_EPOCH);
@@ -15,7 +15,7 @@ export function cmpId(a, b) {
   return x < y ? -1 : x > y ? 1 : 0;
 }
 
-// Accepte un id snowflake, un timestamp en ms ou une date ISO ; renvoie un snowflake ou undefined.
+// Accept a snowflake ID, timestamp in ms, or ISO date; return a snowflake or undefined.
 export function toSnowflake(v) {
   if (v === undefined || v === null || v === '') return undefined;
   const s = String(v).trim();
@@ -24,7 +24,7 @@ export function toSnowflake(v) {
   return Number.isFinite(ms) ? msToSnowflake(ms) : undefined;
 }
 
-// Date/ms -> ms (ou undefined) pour les filtres d'archive.
+// Date/ms -> ms (or undefined) for archive filters.
 export function parseTime(v) {
   if (v === undefined || v === null || v === '') return undefined;
   const s = String(v).trim();
@@ -32,7 +32,7 @@ export function parseTime(v) {
   return Number.isFinite(ms) ? ms : undefined;
 }
 
-// Message brut Discord -> forme normalisée utilisée partout dans le module.
+// Raw Discord message -> normalized form used throughout the module.
 export function normalizeMessage(raw) {
   return {
     id: raw.id,
@@ -56,11 +56,7 @@ export function maskToken(token) {
   return token.length <= 8 ? '••••' : '••••••••' + token.slice(-4);
 }
 
-/**
- * Filtres de protection appliqués localement avant toute suppression/édition (hors sélection explicite) :
- * keepPinned (conserver les épinglés), onlyAttachments, excludeWords (aucun message contenant ces mots).
- * Renvoie null si aucun filtre n'est actif.
- */
+/** Protection filters applied locally before any deletion/edit (except explicit selection): keepPinned (preserve pinned messages), onlyAttachments, excludeWords (exclude messages containing these words). Return null if no filter is active. */
 export function protectionFilter(p = {}) {
   const words = (Array.isArray(p.excludeWords) ? p.excludeWords : [])
     .map((w) => String(w).toLowerCase().trim()).filter(Boolean);
@@ -76,7 +72,7 @@ export function protectionFilter(p = {}) {
   };
 }
 
-/** Valide et normalise les options de protection reçues de l'API. */
+/** Validate and normalize protection options received from the API. */
 export function protectionParams(b = {}) {
   const words = Array.isArray(b.excludeWords) ? b.excludeWords
     : typeof b.excludeWords === 'string' ? b.excludeWords.split(',') : [];

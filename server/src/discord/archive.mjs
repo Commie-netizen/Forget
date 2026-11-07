@@ -1,4 +1,4 @@
-// Archive locale : écrite AVANT toute suppression/édition ; export CSV. Rien ne sort de la machine.
+// Local archive: written BEFORE any deletion/edit; CSV export. Nothing leaves the machine.
 import * as store from './store.mjs';
 import { csvCell as safeCell } from '../csv.mjs';
 
