@@ -26,9 +26,9 @@ jobs:
         run: |
           v=$(node -p "require('./package.json').version")
           for f in server/package.json web/package.json desktop/package.json; do
-            [ "$(node -p "require('./$f').version")" = "$v" ] || { echo "::error::$f n'est pas en $v"; exit 1; }
+            [ "$(node -p "require('./$f').version")" = "$v" ] || { echo "::error::$f is not at version $v"; exit 1; }
           done
-          grep -q "export const VERSION = '$v'" server/src/version.mjs || { echo "::error::server/src/version.mjs n'est pas en $v"; exit 1; }
+          grep -q "export const VERSION = '$v'" server/src/version.mjs || { echo "::error::server/src/version.mjs is not at version $v"; exit 1; }
           [ "${GITHUB_REF_NAME}" = "v$v" ] || { echo "::error::tag ${GITHUB_REF_NAME} != v$v"; exit 1; }
 
       - name: Dependencies
@@ -54,7 +54,7 @@ jobs:
           sha256sum "Forget-$v.exe" > SHA256SUMS.txt
           cat SHA256SUMS.txt
           cd ..
-          node -e "const s=require('fs').readFileSync('CHANGELOG.md','utf8');const m=s.split(/^## /m).find(b=>b.startsWith(process.argv[1]+'\n'));require('fs').writeFileSync('release-notes.md',m?m.slice(m.indexOf('\n')+1).trim():'Voir CHANGELOG.md');" "$v"
+          node -e "const s=require('fs').readFileSync('CHANGELOG.md','utf8').replace(/\r\n/g,'\n');const m=s.split(/^## /m).find(b=>b.startsWith(process.argv[1]+'\n'));require('fs').writeFileSync('release-notes.md',m?m.slice(m.indexOf('\n')+1).trim():'See CHANGELOG.md');" "$v"
 
       - name: Publish the release
         shell: bash
